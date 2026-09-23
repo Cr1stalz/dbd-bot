@@ -1,24 +1,31 @@
 export default async function handler(req, res) {
-  // Устанавливаем заголовки ответа сразу
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
-  // Извлекаем steamid из параметров запроса
-  const steamid = req.query?.steamid ? String(req.query.steamid).trim() : null;
+  // 1. Извлекаем входящее значение (это может быть ID, логин, кастомный URL или полная ссылка)
+  const rawInput = req.query?.steamid ? String(req.query.steamid).trim() : null;
   const appid = "381210";
 
-  // 1. Проверка на отсутствие steamid
-  if (!steamid) {
+  if (!rawInput) {
     return res
       .status(200)
-      .send("⚠️ Укажите SteamID! Пример команды в чате: !dbd 76561199849381839");
+      .send("⚠️ Укажите SteamID или ссылку на профиль! Пример: !dbd 76561199849381839 или !dbd https://steamcommunity.com/id/custom_name");
   }
 
   try {
-    // 2. Получение часов из Steam
+    // 2. Преобразуем ввод (ссылку, кастомный URL или ID) в чистый SteamID64
+    const resolvedSteamId = await resolveSteamId(rawInput);
+
+    if (!resolvedSteamId) {
+      return res
+        .status(200)
+        .send(`❌ Не удалось найти SteamID по переданным данным: ${rawInput}`);
+    }
+
+    // 3. Получаем часы из Steam
     let steamHours = "Неизвестно";
     try {
       const steamResponse = await fetch(
-        `https://decapi.me/steam/hours/${encodeURIComponent(steamid)}/${appid}`
+        `https://decapi.me/steam/hours/${encodeURIComponent(resolvedSteamId)}/${appid}`
       );
       if (steamResponse.ok) {
         const steamText = await steamResponse.text();
@@ -31,23 +38,22 @@ export default async function handler(req, res) {
         }
       }
     } catch (e) {
-      // Игнорируем сбой получения часов, чтобы выдалась хотя бы DBD статистика
+      // Игнорируем сбой получения часов, чтобы выдать остальную статистику
     }
 
-    // 3. Получение DBD статистики
+    // 4. Получаем DBD статистику
     const dbdResponse = await fetch(
-      `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(steamid)}`
+      `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(resolvedSteamId)}`
     );
 
     if (!dbdResponse.ok) {
       return res
         .status(200)
-        .send(`❌ Игрок не найден или профиль скрыт (SteamID: ${steamid})`);
+        .send(`❌ Игрок не найден или профиль скрыт (SteamID: ${resolvedSteamId})`);
     }
 
     const data = await dbdResponse.json();
 
-    // Проверка, вернул ли API корректный объект
     if (!data || typeof data !== "object") {
       return res.status(200).send("❌ Не удалось разобрать данные DBD");
     }
@@ -55,7 +61,6 @@ export default async function handler(req, res) {
     const survivor = rankName(data.survivor_rank);
     const killer = rankName(data.killer_rank);
 
-    // Дополнительные метрики из JSON
     const gens = data.gensrepaired || 0;
     const escapes = data.escaped || 0;
 
@@ -67,11 +72,42 @@ export default async function handler(req, res) {
     return res.status(200).send(result);
 
   } catch (error) {
-    // Безопасный отлов любых остаточных ошибок без падения сервера (500)
     return res
       .status(200)
       .send("❌ Произошла ошибка при запросе статистики DBD.");
   }
+}
+
+// Вспомогательная функция для распознавания ссылки / кастомного имени
+async function resolveSteamId(input) {
+  // Очищаем от случайных кавычек и пробелов
+  let cleaned = input.trim();
+
+  // Если передана полная ссылка на профиль (например, https://steamcommunity.com/id/username/ или /profiles/765611...)
+  if (cleaned.includes("steamcommunity.com")) {
+    const urlParts = cleaned.replace(/\/+$/, "").split("/");
+    cleaned = urlParts[urlParts.length - 1]; // Берем последний сегмент URL
+  }
+
+  // Если это уже чистый 17-значный SteamID64 (начинается на 7656...)
+  if (/^7656\d{13}$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  // Если это Custom URL (кастомный логин профиля), запрашиваем его преобразование в ID64
+  try {
+    const response = await fetch(`https://decapi.me/steam/id/${encodeURIComponent(cleaned)}`);
+    if (response.ok) {
+      const text = (await response.text()).trim();
+      if (/^7656\d{13}$/.test(text)) {
+        return text;
+      }
+    }
+  } catch (e) {
+    // В случае сбоя DecAPI возвращаем исходную строку
+  }
+
+  return cleaned;
 }
 
 function rankName(rank) {

@@ -34,28 +34,19 @@ export default async function handler(req, res) {
     const survivor = rankName(data.survivor_rank);
     const killer = rankName(data.killer_rank);
 
-    // Универсальная обработка даты
-    const rawUpdated = data.updated_at || data.updated || data.last_updated;
+    // Обработка даты обновления (исправлен пересчёт миллисекунд)
     let updatedAt = "Неизвестно";
+    const rawUpdated = data.updated || data.updated_at;
 
     if (rawUpdated) {
-      let timestamp;
-
-      // Если пришло число (Timestamp)
-      if (typeof rawUpdated === "number" || !isNaN(Number(rawUpdated))) {
-        const num = Number(rawUpdated);
-        // Если timestamp в секундах, переводим в миллисекунды
-        timestamp = num < 10000000000 ? num * 1000 : num;
-      } else {
-        // Если пришла строка даты (ISO)
-        timestamp = rawUpdated;
-      }
-
+      const num = Number(rawUpdated);
+      // Если timestamp в секундах, переводим в ms; если уже ms, оставляем как есть
+      const timestamp = num < 10000000000 ? num * 1000 : num;
       const date = new Date(timestamp);
 
       if (!isNaN(date.getTime())) {
         updatedAt = date.toLocaleString("ru-RU", {
-          timeZone: "Europe/Moscow", // Укажите нужный часовой пояс
+          timeZone: "Europe/Moscow",
           day: "2-digit",
           month: "2-digit",
           year: "numeric",

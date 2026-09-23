@@ -1,40 +1,45 @@
 export default async function handler(req, res) {
-  // Ваш SteamID по умолчанию (если команда вызвана без параметров)
   const DEFAULT_STEAMID = "76561199849381839";
   const appid = "381210";
 
-  // Берем значение из ?user=, ?steamid= или ?id=
   let userInput = req.query.user || req.query.steamid || req.query.id;
 
   try {
     let steamid = DEFAULT_STEAMID;
 
     if (userInput && userInput.trim() !== "") {
+      // Многократное декодирование URL на случай двойного encode от Moobot
+      let rawInput = userInput.trim();
       try {
-        userInput = decodeURIComponent(userInput.trim());
-      } catch (e) {
-        userInput = userInput.trim();
-      }
+        rawInput = decodeURIComponent(rawInput);
+        rawInput = decodeURIComponent(rawInput);
+      } catch (e) {}
 
-      // 1. Проверяем, передан ли уже готовый SteamID64 (17 цифр) или ссылка /profiles/
-      let parsedId = extractSteamId(userInput);
+      // 1. Ищем 17 цифр прямо в тексте (если передали SteamID64 или ссылку /profiles/7656119...)
+      const directIdMatch = rawInput.match(/\d{17}/);
 
-      // 2. Если это ссылка /id/ или просто кастомный никнейм
-      if (!parsedId) {
-        const customUrlName = extractCustomUrl(userInput);
-        if (customUrlName) {
-          // Получаем SteamID64 напрямую со страницы профиля Steam
-          parsedId = await resolveSteamCustomUrl(customUrlName);
-        }
-      }
-
-      if (parsedId) {
-        steamid = parsedId;
+      if (directIdMatch) {
+        steamid = directIdMatch[0];
       } else {
-        return res
-          .status(200)
-          .setHeader("Content-Type", "text/plain; charset=utf-8")
-          .send("❌ Некорректный SteamID или ссылка на профиль");
+        // 2. Если 17 цифр нет, значит передан кастомный никнейм или ссылка /id/
+        const customName = extractCustomName(rawInput);
+
+        if (customName) {
+          const resolvedId = await resolveCustomName(customName);
+          if (resolvedId) {
+            steamid = resolvedId;
+          } else {
+            return res
+              .status(200)
+              .setHeader("Content-Type", "text/plain; charset=utf-8")
+              .send("❌ Не удалось найти SteamID для данного профиля");
+          }
+        } else {
+          return res
+            .status(200)
+            .setHeader("Content-Type", "text/plain; charset=utf-8")
+            .send("❌ Некорректный SteamID или ссылка на профиль");
+        }
       }
     }
 
@@ -53,11 +58,9 @@ export default async function handler(req, res) {
           steamHours = hours.toFixed(1).replace(".0", "");
         }
       }
-    } catch (e) {
-      // Игнорируем ошибки часов
-    }
+    } catch (e) {}
 
-    // 2. Получаем DBD статистику
+    // 2. Получаем DBD статистику через tricky.lol
     const dbdResponse = await fetch(
       `https://dbd.tricky.lol/api/playerstats?steamid=${steamid}`
     );
@@ -94,24 +97,16 @@ export default async function handler(req, res) {
   }
 }
 
-// Извлечение SteamID64 из текста или ссылки profiles/
-function extractSteamId(input) {
-  if (/^\d{17}$/.test(input)) {
-    return input;
+// Вытаскиваем чистое имя профиля из любых вариантов ввода
+function extractCustomName(input) {
+  // Если это URL вида .../id/cr1stalz_kz/ или .../id/cr1stalz_kz
+  const idMatch = input.match(/id\/([^\/\?#]+)/i);
+  if (idMatch) {
+    return idMatch[1];
   }
-  const match = input.match(/profiles\/(\d{17})/);
-  return match ? match[1] : null;
-}
 
-// Извлечение кастомного ника из ссылки id/ или чистого текста
-function extractCustomUrl(input) {
+  // Если это просто ник без слэшей и точек
   const clean = input.trim().replace(/\/$/, "");
-
-  const match = clean.match(/id\/([^\/]+)/);
-  if (match) {
-    return match[1];
-  }
-
   if (!clean.includes("/") && !clean.includes(".")) {
     return clean;
   }
@@ -119,20 +114,41 @@ function extractCustomUrl(input) {
   return null;
 }
 
-// Преобразование кастомного ника в SteamID64 путем чтения XML-страницы профиля Steam
-async function resolveSteamCustomUrl(customName) {
+// Преобразуем имя в SteamID64
+async function resolveCustomName(customName) {
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  };
+
+  // Попытка 1: Через XML профиля Steam
   try {
-    const response = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(customName)}/?xml=1`);
-    if (!response.ok) return null;
-    
-    const text = await response.text();
-    const match = text.match(/<steamID64>(\d{17})<\/steamID64>/);
-    if (match) {
-      return match[1];
+    const res = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(customName)}/?xml=1`, { headers });
+    if (res.ok) {
+      const xmlText = await res.text();
+      const match = xmlText.match(/<steamID64>(\d{17})<\/steamID64>/);
+      if (match) return match[1];
     }
-  } catch (e) {
-    console.error("Steam XML resolve error:", e);
-  }
+  } catch (e) {}
+
+  // Попытка 2: Через HTML профиля Steam (ищем g_rgProfileData)
+  try {
+    const res = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(customName)}/`, { headers });
+    if (res.ok) {
+      const htmlText = await res.text();
+      const match = htmlText.match(/"steamid":"(\d{17})"/);
+      if (match) return match[1];
+    }
+  } catch (e) {}
+
+  // Попытка 3: Через API dbd.tricky.lol напрямую
+  try {
+    const res = await fetch(`https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(customName)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.steamid) return data.steamid;
+    }
+  } catch (e) {}
+
   return null;
 }
 

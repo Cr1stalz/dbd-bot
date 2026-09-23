@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     );
   }
 
-  // Исправляем Https:// → https://
+  // Исправляем Https:// / HTTP:// -> https://
   rawInput = rawInput.replace(/^https?:\/\//i, "https://");
 
   try {
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     }
 
     // ========================================
-    // 2. Получаем отображаемый НИК из Steam
+    // 2. Получаем отображаемый ник из Steam
     // ========================================
 
     let steamNickname = "Неизвестно";
@@ -48,7 +48,8 @@ export default async function handler(req, res) {
       if (profileResponse.ok) {
         const profileXml = await profileResponse.text();
 
-        // Ищем отображаемое имя Steam
+        // Steam может вернуть:
+        // <steamID><![CDATA[Cr1stalz_]]></steamID>
         const nicknameMatch = profileXml.match(
           /<steamID>([\s\S]*?)<\/steamID>/
         );
@@ -66,7 +67,6 @@ export default async function handler(req, res) {
       );
     }
 
-    // Защита от пустого ника
     if (!steamNickname) {
       steamNickname = "Неизвестно";
     }
@@ -208,7 +208,7 @@ async function resolveSteamId(input) {
   );
 
   // ========================================
-  // Steam-ссылка
+  // Если это Steam-ссылка
   // ========================================
 
   if (
@@ -251,7 +251,7 @@ async function resolveSteamId(input) {
   }
 
   // ========================================
-  // Если уже SteamID64
+  // Если уже передан SteamID64
   // ========================================
 
   if (/^\d{17}$/.test(cleaned)) {
@@ -259,7 +259,7 @@ async function resolveSteamId(input) {
   }
 
   // ========================================
-  // Получаем SteamID64 через Steam
+  // Определяем SteamID через Steam
   // ========================================
 
   try {
@@ -295,7 +295,7 @@ async function resolveSteamId(input) {
     }
 
     // ====================================
-    // Пробуем XML
+    // Пробуем Steam XML
     // ====================================
 
     const xmlResponse = await fetch(
@@ -313,6 +313,7 @@ async function resolveSteamId(input) {
       const xml =
         await xmlResponse.text();
 
+      // Ищем SteamID64
       let match = xml.match(
         /<steamID64>(\d{17})<\/steamID64>/
       );
@@ -321,6 +322,7 @@ async function resolveSteamId(input) {
         return match[1];
       }
 
+      // Дополнительный поиск SteamID64
       match = xml.match(
         /7656119\d{10}/
       );
@@ -342,11 +344,16 @@ async function resolveSteamId(input) {
 
 
 // ========================================
-// Декодирование HTML
+// Обработка ника Steam
 // ========================================
 
 function decodeHtml(text) {
   return text
+    // Убираем CDATA
+    .replace(/^<!\[CDATA\[/, "")
+    .replace(/\]\]>$/, "")
+
+    // HTML-сущности
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -357,7 +364,7 @@ function decodeHtml(text) {
 
 
 // ========================================
-// Ранги DBD
+// Ранги DBD на русском
 // ========================================
 
 function rankName(rank) {

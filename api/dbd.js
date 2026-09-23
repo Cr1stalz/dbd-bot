@@ -75,7 +75,8 @@ export default async function handler(req, res) {
     // 3. Получаем часы DBD
     // ========================================
 
-    let steamHours = "Неизвестно";
+    // По умолчанию часы скрыты
+    let steamHours = "Скрыто";
 
     try {
       const steamResponse = await fetch(
@@ -96,7 +97,8 @@ export default async function handler(req, res) {
             match[0].replace(",", ".")
           );
 
-          if (!isNaN(hours)) {
+          // Показываем часы только если они реально больше 0
+          if (!isNaN(hours) && hours > 0) {
             steamHours = hours
               .toFixed(1)
               .replace(/\.0$/, "");

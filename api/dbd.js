@@ -9,7 +9,6 @@ export default async function handler(req, res) {
     );
 
     const steamText = (await steamResponse.text()).trim();
-
     const match = steamText.match(/[\d.,]+/);
 
     let steamHours = "Неизвестно";
@@ -35,12 +34,24 @@ export default async function handler(req, res) {
     const survivor = rankName(data.survivor_rank);
     const killer = rankName(data.killer_rank);
 
-    // Bloodpoints
-    const bp = Number(data.bloodpoints || 0);
-    const bloodpoints = (bp / 1000000).toFixed(1) + "M";
+    // Читаемый формат updated (API возвращает Unix timestamp в секундах)
+    let updatedAt = "Неизвестно";
+    if (data.updated) {
+      const date = new Date(data.updated * 1000); // Преобразуем секунды в миллисекунды
+      if (!isNaN(date.getTime())) {
+        updatedAt = date.toLocaleString("ru-RU", {
+          timeZone: "Europe/Moscow", // Укажите нужный часовой пояс
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+    }
 
     const result =
-      `🎮 DBD | ⏱ ${steamHours} ч | 🧑 ${survivor} | 🔪 ${killer} | 💰 ${bloodpoints} BP`;
+      `🎮 DBD | ⏱ ${steamHours} ч | 🧑 ${survivor} | 🔪 ${killer} | 🔄 Обновлено: ${updatedAt}`;
 
     res
       .status(200)

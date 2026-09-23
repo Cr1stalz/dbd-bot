@@ -34,30 +34,15 @@ export default async function handler(req, res) {
     const survivor = rankName(data.survivor_rank);
     const killer = rankName(data.killer_rank);
 
-    // Обработка даты обновления (исправлен пересчёт миллисекунд)
-    let updatedAt = "Неизвестно";
-    const rawUpdated = data.updated || data.updated_at;
-
-    if (rawUpdated) {
-      const num = Number(rawUpdated);
-      // Если timestamp в секундах, переводим в ms; если уже ms, оставляем как есть
-      const timestamp = num < 10000000000 ? num * 1000 : num;
-      const date = new Date(timestamp);
-
-      if (!isNaN(date.getTime())) {
-        updatedAt = date.toLocaleString("ru-RU", {
-          timeZone: "Europe/Moscow",
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-    }
+    // Дополнительные метрики из JSON
+    const gens = data.gensrepaired || 0;
+    const escapes = data.escaped || 0;
+    
+    // Общее количество жертв (жертвы на крюке + убийства мори/навыками)
+    const totalKills = (Number(data.sacrificed) || 0) + (Number(data.killed) || 0);
 
     const result =
-      `🎮 DBD | ⏱ ${steamHours} ч | 🧑 ${survivor} | 🔪 ${killer} | 🔄 Обновлено: ${updatedAt}`;
+      `🎮 DBD | ⏱ ${steamHours} ч | 🧑 ${survivor} | 🔪 ${killer} | 🛠 Гены: ${gens} | 🚪 Побеги: ${escapes} | 💀 Убито: ${totalKills}`;
 
     res
       .status(200)

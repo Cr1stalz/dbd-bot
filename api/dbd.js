@@ -113,13 +113,13 @@ export default async function handler(req, res) {
     // ========================================
 
     const result =
-      `👤 ${steamName} | ` +
-      `⏱ ${steamHours} ч | ` +
-      `🧑 ${survivor} | ` +
-      `🔪 ${killer} | ` +
-      `🛠 Гены: ${gens} | ` +
-      `🚪 Побеги: ${escapes} | ` +
-      `💀 Убито: ${totalKills}`;
+    `[${steamName}] | ` +
+    `⏱ ${steamHours} ч | ` +
+    `🧑 ${survivor} | ` +
+    `🔪 ${killer} | ` +
+    `🛠 Гены: ${gens} | ` +
+    `🚪 Побеги: ${escapes} | ` +
+    `💀 Убито: ${totalKills}`;
 
     return res.status(200).send(result);
 

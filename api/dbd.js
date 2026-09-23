@@ -9,40 +9,22 @@ export default async function handler(req, res) {
   try {
     let steamid = DEFAULT_STEAMID;
 
-    // Если пользователь передал ссылку или никнейм в чате
     if (userInput && userInput.trim() !== "") {
-      // ДЕКОДИРУЕМ URL (превращаем %2F обратно в /, %3A в : и т.д., так как Moobot их кодирует)
       try {
         userInput = decodeURIComponent(userInput.trim());
       } catch (e) {
         userInput = userInput.trim();
       }
 
-      // 1. Проверяем, передан ли уже готовый SteamID64 (17 цифр) или ссылка вида /profiles/765611...
+      // 1. Проверяем, передан ли уже готовый SteamID64 (17 цифр) или ссылка /profiles/
       let parsedId = extractSteamId(userInput);
 
-      // 2. Если это кастомная ссылка (steamcommunity.com/id/...) или просто никнейм
+      // 2. Если это ссылка /id/ или просто кастомный никнейм
       if (!parsedId) {
         const customUrlName = extractCustomUrl(userInput);
         if (customUrlName) {
-          // Запрашиваем превращение ника/ссылки через decapi.me
-          const resolveResponse = await fetch(`https://decapi.me/steam/id/${encodeURIComponent(customUrlName)}`);
-          const resolvedText = (await resolveResponse.text()).trim();
-
-          // Извлекаем 17 цифр из ответа
-          const idMatch = resolvedText.match(/\d{17}/);
-          if (idMatch) {
-            parsedId = idMatch[0];
-          } else {
-            // Фолбэк: запрашиваем прямо у tricky.lol (он тоже умеет резолвить профили)
-            const fallbackRes = await fetch(`https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(customUrlName)}`);
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              if (fallbackData && fallbackData.steamid) {
-                parsedId = fallbackData.steamid;
-              }
-            }
-          }
+          // Получаем SteamID64 напрямую со страницы профиля Steam
+          parsedId = await resolveSteamCustomUrl(customUrlName);
         }
       }
 
@@ -72,7 +54,7 @@ export default async function handler(req, res) {
         }
       }
     } catch (e) {
-      // Игнорируем ошибку получения часов
+      // Игнорируем ошибки часов
     }
 
     // 2. Получаем DBD статистику
@@ -92,7 +74,6 @@ export default async function handler(req, res) {
     const survivor = rankName(data.survivor_rank);
     const killer = rankName(data.killer_rank);
 
-    // Метрики из JSON
     const gens = data.gensrepaired || 0;
     const escapes = data.escaped || 0;
     const totalKills = (Number(data.sacrificed) || 0) + (Number(data.killed) || 0);
@@ -109,7 +90,7 @@ export default async function handler(req, res) {
     res
       .status(200)
       .setHeader("Content-Type", "text/plain; charset=utf-8")
-      .send("❌ Не удалось получить статистику DBD");
+      .send("❌ Ошибка сервера при обработке запроса");
   }
 }
 
@@ -122,22 +103,36 @@ function extractSteamId(input) {
   return match ? match[1] : null;
 }
 
-// Извлечение кастомного ника из ссылки id/ или обычного слова
+// Извлечение кастомного ника из ссылки id/ или чистого текста
 function extractCustomUrl(input) {
-  // Очищаем протокол и слэши в конце
   const clean = input.trim().replace(/\/$/, "");
 
-  // Если передана ссылка вида steamcommunity.com/id/cr1stalz_kz
   const match = clean.match(/id\/([^\/]+)/);
   if (match) {
     return match[1];
   }
 
-  // Если передано просто одно слово/ник без слэшей (например, cr1stalz_kz)
   if (!clean.includes("/") && !clean.includes(".")) {
     return clean;
   }
 
+  return null;
+}
+
+// Преобразование кастомного ника в SteamID64 путем чтения XML-страницы профиля Steam
+async function resolveSteamCustomUrl(customName) {
+  try {
+    const response = await fetch(`https://steamcommunity.com/id/${encodeURIComponent(customName)}/?xml=1`);
+    if (!response.ok) return null;
+    
+    const text = await response.text();
+    const match = text.match(/<steamID64>(\d{17})<\/steamID64>/);
+    if (match) {
+      return match[1];
+    }
+  } catch (e) {
+    console.error("Steam XML resolve error:", e);
+  }
   return null;
 }
 

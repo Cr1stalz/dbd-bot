@@ -498,8 +498,6 @@ function cleanNickname(value) {
 /*
  * ==========================================
  * STEAM HOURS
- *
- * ТОЛЬКО DECAPI
  * ==========================================
  */
 
@@ -538,11 +536,6 @@ async function getSteamHours(steamId) {
 
     if (!response.ok) {
 
-      console.log(
-        "DECAPI NOT OK:",
-        response.status
-      );
-
       return "Время игры скрыто";
     }
 
@@ -556,13 +549,6 @@ async function getSteamHours(steamId) {
       text
     );
 
-    /*
-     * Примеры:
-     *
-     * 746.53 hours
-     * 746.5 hours
-     * 746 hours
-     */
     const match =
       text.match(
         /(\d+(?:[.,]\d+)?)/
@@ -589,11 +575,6 @@ async function getSteamHours(steamId) {
       return "Время игры скрыто";
     }
 
-    /*
-     * 746.53 -> 746.5
-     * 746.50 -> 746.5
-     * 746.00 -> 746
-     */
     return `${hours
       .toFixed(1)
       .replace(/\.0$/, "")} ч`;
@@ -615,16 +596,6 @@ async function getSteamHours(steamId) {
 /*
  * ==========================================
  * DBD
- *
- * ЛОГИКА:
- *
- * 1. profile
- * 2. если profile говорит PRIVATE:
- *       сразу private
- * 3. иначе playerstats
- * 4. если playerstats содержит
- *    больше 10 нулевых значений:
- *       PRIVATE
  * ==========================================
  */
 
@@ -662,19 +633,15 @@ async function getDbdStats(steamId) {
 
 
   /*
-   * ========================================
-   * ЕСЛИ ПРОФИЛЬ ЯВНО PRIVATE
-   * ========================================
+   * Если profile API явно сообщает,
+   * что профиль приватный.
    */
-
   if (
-    isDbdPrivateProfile(
-      profile
-    )
+    isDbdPrivateProfile(profile)
   ) {
 
     console.log(
-      ">>> DBD PRIVATE DETECTED BY PROFILE <<<"
+      ">>> DBD PRIVATE BY PROFILE <<<"
     );
 
     return {
@@ -711,7 +678,7 @@ async function getDbdStats(steamId) {
 
 
   /*
-   * Если API не ответил
+   * API не ответил
    */
   if (!stats) {
     return null;
@@ -719,17 +686,18 @@ async function getDbdStats(steamId) {
 
 
   /*
-   * Обрабатываем JSON.
+   * Обрабатываем playerstats.
    */
   return parseDbdResponse(
-    stats
+    stats,
+    profile
   );
 }
 
 
 /*
  * ==========================================
- * ПРОВЕРКА PRIVATE ПО PROFILE API
+ * PROFILE PRIVATE
  * ==========================================
  */
 
@@ -748,26 +716,27 @@ function isDbdPrivateProfile(data) {
     ).toLowerCase()
     .trim();
 
-  console.log(
-    "PROFILE RESULT VALUE:",
-    data.result
-  );
 
-  console.log(
-    "PROFILE MESSAGE:",
-    message
-  );
+  /*
+   * ВАЖНО:
+   *
+   * result = 1 означает,
+   * что профиль найден.
+   *
+   * Поэтому result = 1
+   * никогда не считаем private.
+   */
+  if (
+    Number(data.result) === 1
+  ) {
+    return false;
+  }
 
 
   /*
-   * Основной ответ Tricky:
-   *
-   * result = 0
-   * message содержит:
-   * "appears to be private"
+   * Явное сообщение private.
    */
   if (
-    Number(data.result) === 0 &&
     message.includes(
       "appears to be private"
     )
@@ -776,11 +745,7 @@ function isDbdPrivateProfile(data) {
   }
 
 
-  /*
-   * Дополнительная защита
-   */
   if (
-    Number(data.result) === 0 &&
     message.includes(
       "don't have any stats for this profile"
     )
@@ -789,11 +754,7 @@ function isDbdPrivateProfile(data) {
   }
 
 
-  /*
-   * Если API напишет просто private
-   */
   if (
-    Number(data.result) === 0 &&
     message === "private"
   ) {
     return true;
@@ -835,11 +796,6 @@ async function fetchJson(url) {
     );
 
     if (!response.ok) {
-
-      console.log(
-        "FETCH NOT OK:",
-        response.status
-      );
 
       return null;
     }
@@ -889,12 +845,13 @@ async function fetchJson(url) {
 /*
  * ==========================================
  * ОБРАБОТКА PLAYERSTATS
- *
- * > 10 НУЛЕЙ = PRIVATE
  * ==========================================
  */
 
-function parseDbdResponse(data) {
+function parseDbdResponse(
+  data,
+  profile
+) {
 
   if (
     !data ||
@@ -906,7 +863,31 @@ function parseDbdResponse(data) {
 
   /*
    * ========================================
-   * PRIVATE ПО СООБЩЕНИЮ API
+   * ЕСЛИ PROFILE API СКАЗАЛ result = 1
+   *
+   * Профиль НЕ private.
+   *
+   * Никакие нули playerstats
+   * здесь не имеют значения.
+   * ========================================
+   */
+
+  if (
+    profile &&
+    Number(profile.result) === 1
+  ) {
+
+    console.log(
+      "DBD PROFILE RESULT = 1 -> PUBLIC"
+    );
+
+    return data;
+  }
+
+
+  /*
+   * ========================================
+   * ЯВНОЕ PRIVATE В PLAYERSTATS
    * ========================================
    */
 
@@ -926,10 +907,6 @@ function parseDbdResponse(data) {
     message === "private"
   ) {
 
-    console.log(
-      ">>> DBD PRIVATE BY MESSAGE <<<"
-    );
-
     return {
       private: true
     };
@@ -938,32 +915,21 @@ function parseDbdResponse(data) {
 
   /*
    * ========================================
-   * СЧИТАЕМ НУЛИ ВО ВСЁМ JSON
-   * ========================================
-   */
-
-  const zeroCount =
-    countZerosInJson(data);
-
-  console.log(
-    "DBD ZERO COUNT:",
-    zeroCount
-  );
-
-
-  /*
-   * ========================================
-   * БОЛЬШЕ 10 НУЛЕЙ = PRIVATE
+   * ПРОВЕРКА ПУСТОГО PLAYERSTATS
    *
-   * 10  -> НЕ private
-   * 11+ -> private
+   * Теперь мы НЕ считаем все нули.
+   *
+   * Смотрим именно на характерную
+   * комбинацию приватного профиля.
    * ========================================
    */
 
-  if (zeroCount > 10) {
+  if (
+    isEmptyPrivateDbdStats(data)
+  ) {
 
     console.log(
-      ">>> DBD PRIVATE: MORE THAN 10 ZEROS <<<"
+      ">>> DBD PRIVATE EMPTY STATS <<<"
     );
 
     return {
@@ -974,7 +940,7 @@ function parseDbdResponse(data) {
 
   /*
    * ========================================
-   * ПРОВЕРЯЕМ НАЛИЧИЕ СТАТИСТИКИ
+   * ПРОВЕРКА НАЛИЧИЯ СТАТИСТИКИ
    * ========================================
    */
 
@@ -995,8 +961,7 @@ function parseDbdResponse(data) {
 
 
   /*
-   * Нулевые значения разрешены,
-   * если их 10 или меньше.
+   * Нормальная статистика.
    */
   return data;
 }
@@ -1004,69 +969,166 @@ function parseDbdResponse(data) {
 
 /*
  * ==========================================
- * ПОДСЧЁТ НУЛЕЙ В JSON
+ * ОПРЕДЕЛЕНИЕ ПУСТОГО PRIVATE JSON
+ * ==========================================
+ *
+ * Характерный ответ:
+ *
+ * survivor_rank = 20
+ * killer_rank   = 20
+ * playtime      = 0
+ * updated_at    = 0
+ * bloodpoints   = 0
+ *
+ * И практически все игровые показатели = 0.
+ *
+ * ВАЖНО:
+ *
+ * Не проверяем просто количество нулей.
  * ==========================================
  */
 
-function countZerosInJson(data) {
+function isEmptyPrivateDbdStats(data) {
 
-  let count = 0;
+  /*
+   * Должны присутствовать основные поля.
+   */
+  if (
+    data.survivor_rank == null ||
+    data.killer_rank == null ||
+    data.playtime == null ||
+    data.updated_at == null
+  ) {
+    return false;
+  }
 
 
-  function walk(value) {
+  /*
+   * Приватный пустой профиль обычно
+   * имеет оба ранга на 20.
+   */
+  const ranksAreEmpty =
+    Number(data.survivor_rank) === 20 &&
+    Number(data.killer_rank) === 20;
 
-    /*
-     * Числовой 0
-     */
-    if (value === 0) {
-      count++;
-      return;
+
+  if (!ranksAreEmpty) {
+    return false;
+  }
+
+
+  /*
+   * Время игры должно быть 0.
+   */
+  if (
+    Number(data.playtime) !== 0
+  ) {
+    return false;
+  }
+
+
+  /*
+   * updated_at должен быть 0.
+   */
+  if (
+    Number(data.updated_at) !== 0
+  ) {
+    return false;
+  }
+
+
+  /*
+   * Считаем только реальные игровые
+   * статистические поля.
+   *
+   * Не учитываем:
+   *
+   * steamid
+   * hash
+   * created_at
+   * updated_at
+   * playtime
+   * banstate
+   */
+
+  const ignoredFields = new Set([
+    "steamid",
+    "hash",
+    "created_at",
+    "updated_at",
+    "playtime",
+    "banstate"
+  ]);
+
+
+  let statisticFields = 0;
+  let zeroStatistics = 0;
+
+
+  for (
+    const [key, value]
+    of Object.entries(data)
+  ) {
+
+    if (
+      ignoredFields.has(key)
+    ) {
+      continue;
     }
 
 
     /*
-     * Строковый "0"
+     * Учитываем только числовые
+     * статистические значения.
      */
     if (
-      typeof value === "string" &&
-      value.trim() === "0"
+      typeof value !== "number"
     ) {
-      count++;
-      return;
+      continue;
     }
 
 
-    /*
-     * Массив
-     */
-    if (Array.isArray(value)) {
-
-      for (const item of value) {
-        walk(item);
-      }
-
-      return;
-    }
+    statisticFields++;
 
 
-    /*
-     * Объект
-     */
     if (
-      value !== null &&
-      typeof value === "object"
+      value === 0
     ) {
-
-      for (const key of Object.keys(value)) {
-        walk(value[key]);
-      }
+      zeroStatistics++;
     }
   }
 
 
-  walk(data);
+  console.log(
+    "DBD STATISTIC FIELDS:",
+    statisticFields
+  );
 
-  return count;
+  console.log(
+    "DBD ZERO STATISTIC FIELDS:",
+    zeroStatistics
+  );
+
+
+  /*
+   * Для приватного JSON почти все
+   * статистические поля нулевые.
+   *
+   * Используем 95%.
+   */
+  if (
+    statisticFields > 50 &&
+    (
+      zeroStatistics /
+      statisticFields
+    ) >= 0.95
+  ) {
+
+    return true;
+  }
+
+
+  return false;
 }
 
 

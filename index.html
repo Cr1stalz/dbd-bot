@@ -1,6 +1,1127 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>DBD Twitch Stats — Настройка</title>
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101014'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23ef3340' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23ef3340'/%3E%3C/svg%3E">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% -10%, rgba(239, 51, 64, 0.13), transparent 35%),
+        linear-gradient(180deg, #09090c 0%, #0d0d12 100%);
+      color: #f1f1f4;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 45px 45px;
+      mask-image: linear-gradient(to bottom, black, transparent 80%);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .container {
+      width: min(1100px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      background: rgba(9, 9, 12, 0.82);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .header-inner {
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -0.3px;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #ef3340, #a91522);
+      box-shadow: 0 0 25px rgba(239, 51, 64, 0.2);
+      font-size: 18px;
+    }
+
+    .discord {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #b8b8c2;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .discord-dot {
+      width: 8px;
+      height: 8px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      background: #ef3340;
+      box-shadow:
+        0 0 8px rgba(239, 51, 64, 0.9),
+        0 0 16px rgba(239, 51, 64, 0.45);
+      animation: discordPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes discordPulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.55;
+        transform: scale(0.85);
+      }
+    }
+
+    .discord-name {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    /* HERO */
+
+    .hero {
+      text-align: center;
+      padding: 80px 0 55px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: rgba(239, 51, 64, 0.08);
+      border: 1px solid rgba(239, 51, 64, 0.25);
+      color: #ff9299;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 22px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(36px, 6vw, 64px);
+      line-height: 1;
+      letter-spacing: -2.5px;
+      font-weight: 900;
+    }
+
+    .hero h1 span {
+      color: #ef3340;
+    }
+
+    .hero p {
+      max-width: 650px;
+      margin: 22px auto 0;
+      color: #a3a3af;
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    /* STEPS */
+
+    .steps {
+      display: grid;
+      gap: 22px;
+      padding-bottom: 70px;
+    }
+
+    .card {
+      position: relative;
+      background: rgba(19, 19, 25, 0.88);
+      border: 1px solid rgba(255,255,255,0.075);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 3px;
+      height: 100%;
+      background: linear-gradient(to bottom, #ef3340, transparent);
+      opacity: 0.8;
+    }
+
+    .step-title {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-bottom: 22px;
+    }
+
+    .step-number {
+      width: 38px;
+      height: 38px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 11px;
+      background: rgba(239, 51, 64, 0.12);
+      border: 1px solid rgba(239, 51, 64, 0.25);
+      color: #ff5c66;
+      font-weight: 900;
+    }
+
+    .step-title h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .step-title p {
+      margin: 4px 0 0;
+      color: #858591;
+      font-size: 13px;
+    }
+
+    /* BOT SELECT */
+
+    .bot-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .bot-option {
+      cursor: pointer;
+      padding: 20px;
+      border-radius: 15px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #14141b;
+      transition: 0.2s ease;
+      user-select: none;
+    }
+
+    .bot-option:hover {
+      border-color: rgba(239, 51, 64, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .bot-option.active {
+      border-color: #ef3340;
+      background: rgba(239, 51, 64, 0.08);
+      box-shadow: 0 0 30px rgba(239, 51, 64, 0.08);
+    }
+
+    .bot-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .bot-name {
+      font-weight: 800;
+      font-size: 17px;
+    }
+
+    .check {
+      width: 21px;
+      height: 21px;
+      border-radius: 50%;
+      border: 1px solid #44444e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: transparent;
+      font-size: 12px;
+    }
+
+    .bot-option.active .check {
+      background: #ef3340;
+      border-color: #ef3340;
+      color: white;
+    }
+
+    .bot-description {
+      color: #888894;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* CONFIG */
+
+    .config-box {
+      background: #0e0e13;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+
+    .config-label {
+      color: #b7b7c0;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .instruction-list {
+      margin: 0 0 18px;
+      padding-left: 22px;
+      color: #a8a8b2;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .instruction-list li {
+      margin-bottom: 7px;
+    }
+
+    .instruction-list strong {
+      color: #eeeeF2;
+    }
+
+    .code-box {
+      position: relative;
+      background: #08080b;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 15px 52px 15px 16px;
+      font-family: Consolas, Monaco, monospace;
+      color: #e5e5eb;
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+      word-break: break-word;
+    }
+
+    .copy-btn {
+      position: absolute;
+      right: 9px;
+      top: 9px;
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 9px;
+      background: #191920;
+      color: #aaaab5;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: #26262e;
+      color: white;
+    }
+
+    .argument-pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 8px;
+      background: rgba(50, 205, 120, 0.13);
+      border: 1px solid rgba(50, 205, 120, 0.42);
+      color: #61e59a;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: #777782;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* COMMAND */
+
+    .command-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 16px;
+      background: #08080b;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 14px;
+    }
+
+    .command-highlight {
+      color: #ff6570;
+      font-weight: 700;
+    }
+
+    /* CHAT */
+
+    .chat {
+      background: #0a0a0e;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 15px;
+      padding: 18px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .chat-line {
+      white-space: nowrap;
+    }
+
+    .chat-user {
+      color: #9c9ca7;
+    }
+
+    .chat-bot {
+      color: #ef3340;
+      font-weight: 800;
+    }
+
+    .chat-response {
+      color: #e7e7ec;
+      white-space: normal;
+    }
+
+    .delay-note {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(255, 190, 60, 0.06);
+      border: 1px solid rgba(255, 190, 60, 0.18);
+      color: #bcb5a4;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    /* FOOTER */
+
+    .footer {
+      padding: 10px 0 45px;
+      text-align: center;
+      color: #666671;
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    .footer-quote {
+      display: inline-block;
+      max-width: 700px;
+      line-height: 1.6;
+    }
+
+    /* MOBILE */
+
+    @media (max-width: 700px) {
+
+      .container {
+        width: min(100% - 20px, 1100px);
+      }
+
+      .header-inner {
+        height: 62px;
+      }
+
+      .brand {
+        font-size: 14px;
+      }
+
+      .brand-icon {
+        width: 31px;
+        height: 31px;
+      }
+
+      .discord {
+        font-size: 12px;
+        gap: 6px;
+      }
+
+      .discord-dot {
+        width: 7px;
+        height: 7px;
+      }
+
+      .hero {
+        padding: 60px 0 40px;
+      }
+
+      .hero h1 {
+        letter-spacing: -1.5px;
+      }
+
+      .hero p {
+        font-size: 15px;
+      }
+
+      .card {
+        padding: 20px 17px;
+        border-radius: 16px;
+      }
+
+      .bot-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .step-title h2 {
+        font-size: 18px;
+      }
+
+      .code-box {
+        font-size: 11px;
+      }
+
+      .chat {
+        font-size: 11px;
+      }
+
+      .instruction-list {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div class="container header-inner">
+
+    <div class="brand">
+      <div class="brand-icon">🎮</div>
+      <span>DBD Twitch Stats</span>
+    </div>
+
+    <div class="discord">
+      <span class="discord-dot"></span>
+      <span>Discord:</span>
+      <span class="discord-name">@cr1stalz</span>
+    </div>
+
+  </div>
+</header>
+
+
+<main>
+
+  <!-- HERO -->
+
+  <section class="hero">
+
+    <div class="container">
+
+      <div class="badge">
+        ⚠️ Работает на бесплатном хосте — возможны задержки и зависания
+      </div>
+
+      <h1>
+        Настрой <span>DBD Twitch Stats</span>
+      </h1>
+
+      <p>
+        Добавь команду в Twitch-бота и выводи статистику
+        Dead by Daylight прямо в чат.
+      </p>
+
+    </div>
+
+  </section>
+
+
+  <!-- STEPS -->
+
+  <section class="container steps">
+
+
+    <!-- STEP 1 -->
+
+    <div class="card">
+
+      <div class="step-title">
+
+        <div class="step-number">
+          1
+        </div>
+
+        <div>
+          <h2>Выбери Twitch-бота</h2>
+
+          <p>
+            Выбери сервис, который используешь на канале.
+          </p>
+        </div>
+
+      </div>
+
+
+      <div class="bot-grid">
+
+
+        <div
+          class="bot-option active"
+          data-bot="moobot"
+          data-name="Moobot"
+        >
+
+          <div class="bot-top">
+
+            <div class="bot-name">
+              🤖 Moobot
+            </div>
+
+            <div class="check">
+              ✓
+            </div>
+
+          </div>
+
+          <div class="bot-description">
+            Настройка через Custom Command и URL fetch.
+          </div>
+
+        </div>
+
+
+        <div
+          class="bot-option"
+          data-bot="streamelements"
+          data-name="StreamElements"
+        >
+
+          <div class="bot-top">
+
+            <div class="bot-name">
+              🟣 StreamElements
+            </div>
+
+            <div class="check">
+              ✓
+            </div>
+
+          </div>
+
+          <div class="bot-description">
+            Настройка через Custom Command.
+          </div>
+
+        </div>
+
+
+      </div>
+
+    </div>
+
+
+    <!-- STEP 2 -->
+
+    <div class="card">
+
+      <div class="step-title">
+
+        <div class="step-number">
+          2
+        </div>
+
+        <div>
+
+          <h2>Настрой бота</h2>
+
+          <p>
+            Следуй инструкции для выбранного бота.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <!-- MOOBOT -->
+
+      <div id="moobotConfig">
+
+        <div class="config-box">
+
+          <div class="config-label">
+            🤖 Настройка Moobot
+          </div>
+
+
+          <ol class="instruction-list">
+
+            <li>
+              Открой панель управления
+              <strong>Moobot</strong>.
+            </li>
+
+            <li>
+              Перейди в раздел
+              <strong>Commands → Custom Commands</strong>.
+            </li>
+
+            <li>
+              Создай новую команду
+              <strong>!dbd</strong>.
+            </li>
+
+            <li>
+              В
+              <strong>Response</strong>
+              выбери
+              <strong>URL fetch → Full (plain) response</strong>.
+            </li>
+
+            <li>
+              В поле
+              <strong>URL to fetch</strong>
+              вставь адрес ниже.
+            </li>
+
+            <li>
+              После знака
+              <strong>steamid=</strong>
+              добавь
+              <strong>Command argument 1</strong>.
+            </li>
+
+          </ol>
+
+
+          <div class="config-label">
+            URL to fetch:
+          </div>
+
+
+          <div class="code-box">
+
+            https://dbd-bot-livid.vercel.app/api/dbd?steamid=<span class="argument-pill">Command argument 1</span>
+
+
+            <button
+              class="copy-btn"
+              onclick="copyText('https://dbd-bot-livid.vercel.app/api/dbd?steamid=')"
+              title="Копировать"
+            >
+              ⧉
+            </button>
+
+          </div>
+
+
+          <div class="hint">
+
+            ⚠️ Важно: между
+            <b>steamid=</b>
+            и
+            <b>Command argument 1</b>
+            <b>не должно быть пробела</b>.
+
+          </div>
+
+
+          <div class="hint">
+
+            💡 В результате должна получиться строка:
+
+            <br><br>
+
+            <code>
+              https://dbd-bot-livid.vercel.app/api/dbd?steamid=Command argument 1
+            </code>
+
+          </div>
+
+
+          <div class="hint">
+
+            👤 Зритель передаёт ссылку на Steam-профиль
+            первым аргументом команды.
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- STREAM ELEMENTS -->
+
+      <div
+        id="streamelementsConfig"
+        style="display:none;"
+      >
+
+        <div class="config-box">
+
+          <div class="config-label">
+            🟣 Настройка StreamElements
+          </div>
+
+
+          <ol class="instruction-list">
+
+            <li>
+              Открой
+              <strong>StreamElements</strong>.
+            </li>
+
+            <li>
+              Перейди в
+              <strong>Chat Bot → Commands</strong>.
+            </li>
+
+            <li>
+              Создай новую Custom Command
+              <strong>!dbd</strong>.
+            </li>
+
+            <li>
+              В поле ответа вставь готовую строку ниже.
+            </li>
+
+          </ol>
+
+
+          <div class="code-box">
+
+            $(customapi https://dbd-bot-livid.vercel.app/api/dbd?steamid=$(queryescape $(1:)))
+
+
+            <button
+              class="copy-btn"
+              onclick="copyText('$(customapi https://dbd-bot-livid.vercel.app/api/dbd?steamid=$(queryescape $(1:)))')"
+              title="Копировать"
+            >
+              ⧉
+            </button>
+
+          </div>
+
+
+          <div class="hint">
+
+            💡 Команда принимает ссылку на Steam-профиль
+            первым аргументом.
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- STEP 3 -->
+
+    <div class="card">
+
+      <div class="step-title">
+
+        <div class="step-number">
+          3
+        </div>
+
+        <div>
+
+          <h2>Проверь команду</h2>
+
+          <p>
+            Команда всегда называется <b>!dbd</b>.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="command-box">
+
+        <span class="command-highlight">
+          !dbd
+        </span>
+
+        <span>
+          https://steamcommunity.com/id/cr1stalz_kz/
+        </span>
+
+
+        <button
+          class="copy-btn"
+          onclick="copyText('!dbd https://steamcommunity.com/id/cr1stalz_kz/')"
+          title="Копировать"
+          style="
+            position:relative;
+            top:auto;
+            right:auto;
+            margin-left:auto;
+          "
+        >
+          ⧉
+        </button>
+
+      </div>
+
+
+      <div class="hint">
+
+        Зритель может указать любой Steam-профиль.
+        Профиль не привязан к самой команде.
+
+      </div>
+
+    </div>
+
+
+    <!-- STEP 4 -->
+
+    <div class="card">
+
+      <div class="step-title">
+
+        <div class="step-number">
+          4
+        </div>
+
+        <div>
+
+          <h2>Пример в Twitch-чате</h2>
+
+          <p>
+            Вот как команда будет выглядеть для зрителей.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="chat">
+
+        <div class="chat-line">
+
+          <span class="chat-user">
+            Viewer123:
+          </span>
+
+          !dbd
+          https://steamcommunity.com/id/cr1stalz_kz/
+
+        </div>
+
+
+        <div class="chat-line">
+
+          <span
+            class="chat-bot"
+            id="chatBotName"
+          >
+            Moobot:
+          </span>
+
+          <span class="chat-response">
+
+            👤 Cr1stalz |
+            ⏱ 746.5 ч |
+            🔪 Ранг убийцы: Бронза III |
+            🧑 Ранг выжившего: Бронза I |
+            ☠️ Убийства: 1451 |
+            🏃 Побеги: 899 |
+            ⭐ Макс. престиж: 58 |
+            ⚙️ Генераторов: 3190 |
+            🩸 Очки крови: 256.19 млн
+
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <div class="delay-note">
+
+        ⏱️ Рекомендуется добавить задержку
+        <b>5–10 секунд</b>
+        для команды <b>!dbd</b>.
+        Это снизит количество одновременных запросов
+        и поможет избежать лишней нагрузки
+        на бесплатный хост.
+
+      </div>
+
+
+    </div>
+
+
+  </section>
+
+</main>
+
+
+<footer class="footer">
+
+  <div class="container">
+
+    <div class="footer-quote">
+
+      «Мы не можем выбрать судьбу,
+      но можем выбрать,
+      как встретить её.»
+
+    </div>
+
+  </div>
+
+</footer>
+
+
+<script>
+
+  const botOptions =
+    document.querySelectorAll(".bot-option");
+
+  const moobotConfig =
+    document.getElementById("moobotConfig");
+
+  const streamelementsConfig =
+    document.getElementById("streamelementsConfig");
+
+  const chatBotName =
+    document.getElementById("chatBotName");
+
+
+  botOptions.forEach(option => {
+
+    option.addEventListener("click", () => {
+
+      botOptions.forEach(item => {
+        item.classList.remove("active");
+      });
+
+      option.classList.add("active");
+
+
+      const bot =
+        option.dataset.bot;
+
+      const botName =
+        option.dataset.name;
+
+
+      if (bot === "moobot") {
+
+        moobotConfig.style.display =
+          "block";
+
+        streamelementsConfig.style.display =
+          "none";
+
+      }
+
+
+      if (bot === "streamelements") {
+
+        moobotConfig.style.display =
+          "none";
+
+        streamelementsConfig.style.display =
+          "block";
+
+      }
+
+
+      chatBotName.textContent =
+        botName + ":";
+
+    });
+
+  });
+
+
+  function copyText(text) {
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+
+        const buttons =
+          document.querySelectorAll(".copy-btn");
+
+
+        buttons.forEach(button => {
+
+          const oldText =
+            button.textContent;
+
+          button.textContent =
+            "✓";
+
+
+          setTimeout(() => {
+
+            button.textContent =
+              oldText;
+
+          }, 1200);
+
+        });
+
+      });
+
+  }
+
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="ru">
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 

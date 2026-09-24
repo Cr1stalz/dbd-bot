@@ -13,7 +13,10 @@ export default async function handler(req, res) {
     );
   }
 
+  // ========================================
   // Исправляем Https:// / HTTP:// -> https://
+  // ========================================
+
   rawInput = rawInput.replace(/^https?:\/\//i, "https://");
 
   try {
@@ -50,6 +53,7 @@ export default async function handler(req, res) {
 
         // Steam может вернуть:
         // <steamID><![CDATA[Cr1stalz_]]></steamID>
+
         const nicknameMatch = profileXml.match(
           /<steamID>([\s\S]*?)<\/steamID>/
         );
@@ -75,8 +79,6 @@ export default async function handler(req, res) {
     // 3. Получаем часы DBD
     // ========================================
 
-    // Если часы скрыты, показываем:
-    // "Время игры скрыто"
     let steamHours = "Время игры скрыто";
 
     try {
@@ -98,7 +100,6 @@ export default async function handler(req, res) {
             match[0].replace(",", ".")
           );
 
-          // Показываем часы только если они больше 0
           if (!isNaN(hours) && hours > 0) {
             steamHours = hours
               .toFixed(1)
@@ -120,25 +121,103 @@ export default async function handler(req, res) {
     const dbdResponse = await fetch(
       `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
         resolvedSteamId
-      )}`
+      )}`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+          "Accept": "application/json"
+        }
+      }
     );
+
+    // ========================================
+    // 5. Если профиль не найден (404)
+    // ========================================
+
+    if (dbdResponse.status === 404) {
+      console.log(
+        `Профиль ${resolvedSteamId} не найден. Отправляем запрос на добавление.`
+      );
+
+      try {
+        const addProfileResponse = await fetch(
+          `https://dbd.tricky.lol/?json=profile&profile=${encodeURIComponent(
+            resolvedSteamId
+          )}`,
+          {
+            method: "GET",
+            headers: {
+              "User-Agent": "Mozilla/5.0",
+              "Accept": "application/json",
+              "X-Requested-With": "XMLHttpRequest"
+            }
+          }
+        );
+
+        console.log(
+          `Запрос добавления профиля ${resolvedSteamId}: HTTP ${addProfileResponse.status}`
+        );
+
+        // ========================================
+        // Профиль отправлен на добавление
+        // ========================================
+
+        if (
+          addProfileResponse.ok ||
+          addProfileResponse.status === 200
+        ) {
+          return res.status(200).send(
+            "⏳ Профиль добавляется в базу DBD Tricky. " +
+            "Подождите около 5 минут и повторите команду."
+          );
+        }
+
+        // ========================================
+        // Если сайт ответил ошибкой
+        // ========================================
+
+        return res.status(200).send(
+          "⏳ Профиль ещё не найден в базе DBD Tricky. " +
+          "Подождите около 5 минут и повторите команду."
+        );
+
+      } catch (error) {
+        console.error(
+          "Ошибка добавления профиля в DBD Tricky:",
+          error
+        );
+
+        return res.status(200).send(
+          "⏳ Профиль ещё не найден в базе DBD Tricky. " +
+          "Подождите около 5 минут и повторите команду."
+        );
+      }
+    }
+
+    // ========================================
+    // Другие ошибки DBD API
+    // ========================================
 
     if (!dbdResponse.ok) {
       return res.status(200).send(
-        "❌ Профиль не найден или закрыт"
+        "❌ Не удалось получить статистику профиля"
       );
     }
+
+    // ========================================
+    // 6. Читаем JSON
+    // ========================================
 
     const data = await dbdResponse.json();
 
     if (!data || typeof data !== "object") {
       return res.status(200).send(
-        "❌ Профиль не найден или закрыт"
+        "❌ Не удалось получить статистику профиля"
       );
     }
 
     // ========================================
-    // 5. Ранги
+    // 7. Ранги
     // ========================================
 
     const survivor = rankName(
@@ -150,7 +229,7 @@ export default async function handler(req, res) {
     );
 
     // ========================================
-    // 6. Статистика
+    // 8. Статистика
     // ========================================
 
     const gens =
@@ -164,13 +243,17 @@ export default async function handler(req, res) {
       (Number(data.killed) || 0);
 
     // ========================================
-    // 7. Итог
+    // 9. Часы
     // ========================================
 
     const hoursText =
       steamHours === "Время игры скрыто"
         ? "Время игры скрыто"
         : `${steamHours} ч`;
+
+    // ========================================
+    // 10. Итог
+    // ========================================
 
     const result =
       `🎮 Статистика игрока [${steamNickname}] | ` +
@@ -287,7 +370,10 @@ async function resolveSteamId(input) {
       }
     );
 
+    // ========================================
     // Проверяем редирект
+    // ========================================
+
     const location =
       response.headers.get("location");
 
@@ -302,9 +388,9 @@ async function resolveSteamId(input) {
       }
     }
 
-    // ====================================
+    // ========================================
     // Пробуем Steam XML
-    // ====================================
+    // ========================================
 
     const xmlResponse = await fetch(
       `https://steamcommunity.com/id/${encodeURIComponent(

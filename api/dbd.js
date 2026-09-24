@@ -1,51 +1,22 @@
 export default async function handler(req, res) {
-  res.setHeader(
-    "Content-Type",
-    "text/plain; charset=utf-8"
-  );
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
-  let rawInput = req.query?.steamid
-    ? String(req.query.steamid).trim()
-    : "";
+  let input = String(req.query?.steamid || "").trim();
 
-  const appid = "381210";
-
-  if (!rawInput) {
+  if (!input) {
     return res.status(200).send(
       "⚠️ Укажите SteamID или ссылку на профиль!"
     );
   }
 
-  // ========================================
-  // Очистка ввода
-  // ========================================
-
-  rawInput = rawInput
-    .replace(/^["']|["']$/g, "")
-    .trim();
-
-  rawInput = rawInput.replace(
-    /^https?:\/\//i,
-    "https://"
-  );
+  input = cleanInput(input);
 
   try {
-    // ========================================
     // 1. Получаем SteamID64
-    // ========================================
+    const steamId = await resolveSteamId(input);
 
-    const steamId =
-      await resolveSteamId(rawInput);
-
-    console.log(
-      "INPUT:",
-      rawInput
-    );
-
-    console.log(
-      "STEAM ID:",
-      steamId
-    );
+    console.log("INPUT:", input);
+    console.log("STEAM ID:", steamId);
 
     if (!steamId) {
       return res.status(200).send(
@@ -53,523 +24,350 @@ export default async function handler(req, res) {
       );
     }
 
-    // ========================================
-    // 2. Получаем ник Steam
-    // ========================================
+    // 2. Получаем всё остальное параллельно
+    const [nickname, hours, dbd] = await Promise.all([
+      getSteamNickname(steamId),
+      getSteamHours(steamId),
+      getDbdStats(steamId)
+    ]);
 
-    let steamNickname =
-      "Неизвестно";
-
-    try {
-      const response =
-        await fetch(
-          `https://steamcommunity.com/profiles/${steamId}/?xml=1`,
-          {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0"
-            },
-            cache: "no-store"
-          }
-        );
-
-      if (response.ok) {
-        const xml =
-          await response.text();
-
-        const match =
-          xml.match(
-            /<steamID>([\s\S]*?)<\/steamID>/
-          );
-
-        if (
-          match &&
-          match[1]
-        ) {
-          steamNickname =
-            decodeHtml(
-              match[1].trim()
-            );
-        }
-      }
-    } catch (error) {
-      console.error(
-        "Ошибка Steam nickname:",
-        error
-      );
-    }
-
-    // ========================================
-    // 3. Получаем часы
-    // ========================================
-
-    let steamHours =
-      "Время игры скрыто";
-
-    try {
-      const response =
-        await fetch(
-          `https://decapi.me/steam/hours/${encodeURIComponent(
-            steamId
-          )}/${appid}`,
-          {
-            cache: "no-store"
-          }
-        );
-
-      if (response.ok) {
-        const text =
-          (
-            await response.text()
-          ).trim();
-
-        const match =
-          text.match(
-            /[\d.,]+/
-          );
-
-        if (match) {
-          const hours =
-            parseFloat(
-              match[0].replace(
-                ",",
-                "."
-              )
-            );
-
-          if (
-            !isNaN(hours) &&
-            hours > 0
-          ) {
-            steamHours =
-              hours
-                .toFixed(1)
-                .replace(
-                  /\.0$/,
-                  ""
-                );
-          }
-        }
-      }
-    } catch (error) {
-      console.error(
-        "Ошибка часов:",
-        error
-      );
-    }
-
-    // ========================================
-    // 4. Получаем DBD статистику
-    // ========================================
-
-    let data;
-
-    try {
-      const response =
-        await fetch(
-          `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
-            steamId
-          )}`,
-          {
-            method: "GET",
-
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0",
-              "Accept":
-                "application/json"
-            },
-
-            cache: "no-store"
-          }
-        );
-
-      data =
-        await response.json();
-
-    } catch (error) {
-      console.error(
-        "Ошибка DBD API:",
-        error
-      );
-
+    if (!dbd) {
       return res.status(200).send(
         "❌ Не удалось получить статистику профиля"
       );
     }
 
-    if (
-      !data ||
-      typeof data !== "object"
-    ) {
-      return res.status(200).send(
-        "❌ Не удалось получить статистику профиля"
-      );
-    }
-
-    // ========================================
-    // 5. Ранги
-    // ========================================
-
-    const survivor =
-      rankName(
-        data.survivor_rank
-      );
-
-    const killer =
-      rankName(
-        data.killer_rank
-      );
-
-    // ========================================
-    // 6. Статистика
-    // ========================================
-
-    const gens =
-      Number(
-        data.gensrepaired
-      ) || 0;
-
-    const escapes =
-      Number(
-        data.escaped
-      ) || 0;
-
-    const totalKills =
-      (Number(
-        data.sacrificed
-      ) || 0) +
-      (Number(
-        data.killed
-      ) || 0);
-
-    // ========================================
-    // 7. Финальный ответ
-    // ========================================
-
+    // 3. Формируем ответ
     const result =
-      `🎮 Статистика игрока [${steamNickname}] | ` +
-      `⏱ ${
-        steamHours ===
-        "Время игры скрыто"
-          ? "Время игры скрыто"
-          : `${steamHours} ч`
-      } | ` +
-      `🧑 ${survivor} | ` +
-      `🔪 ${killer} | ` +
-      `🛠 Гены: ${gens} | ` +
-      `🚪 Побеги: ${escapes} | ` +
-      `💀 Убито: ${totalKills}`;
+      `🎮 Статистика игрока [${nickname}] | ` +
+      `⏱ ${hours} | ` +
+      `🧑 ${rankName(dbd.survivor_rank)} | ` +
+      `🔪 ${rankName(dbd.killer_rank)} | ` +
+      `🛠 Гены: ${toNumber(dbd.gensrepaired)} | ` +
+      `🚪 Побеги: ${toNumber(dbd.escaped)} | ` +
+      `💀 Убито: ${toNumber(dbd.sacrificed) + toNumber(dbd.killed)}`;
 
-    return res.status(200).send(
-      result
-    );
+    return res.status(200).send(result);
 
   } catch (error) {
-    console.error(
-      "Общая ошибка:",
-      error
-    );
+    console.error("Общая ошибка:", error);
 
     return res.status(200).send(
-      "❌ Профиль не найден или закрыт"
+      "❌ Не удалось получить статистику профиля"
     );
   }
 }
 
 
-// ========================================
-// Определение SteamID64
-// ========================================
+/* =========================
+   INPUT
+========================= */
+
+function cleanInput(input) {
+  return String(input)
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/^https?:\/\//i, "https://");
+}
+
+
+/* =========================
+   STEAM ID
+========================= */
 
 async function resolveSteamId(input) {
+  let value = cleanInput(input);
 
-  let cleaned =
-    String(input).trim();
-
-  cleaned = cleaned.replace(
-    /^["']|["']$/g,
-    ""
-  );
-
-  cleaned = cleaned.replace(
-    /^https?:\/\//i,
-    "https://"
-  );
-
-  // ========================================
-  // Вариант 1 — обычный SteamID64
-  // ========================================
-
-  if (
-    /^7656119\d{10}$/.test(
-      cleaned
-    )
-  ) {
-    return cleaned;
+  // Прямой SteamID64
+  if (isSteamId(value)) {
+    return value;
   }
 
-  // ========================================
-  // Вариант 2 — Steam URL
-  // ========================================
-
-  if (
-    cleaned
-      .toLowerCase()
-      .includes(
-        "steamcommunity.com"
-      )
-  ) {
-
+  // Steam URL
+  if (/steamcommunity\.com/i.test(value)) {
     try {
+      const url = new URL(value);
 
-      const url =
-        new URL(cleaned);
+      const parts = url.pathname
+        .split("/")
+        .filter(Boolean);
 
-      const parts =
-        url.pathname
-          .split("/")
-          .filter(Boolean);
-
-      if (
-        parts.length < 2
-      ) {
+      if (parts.length < 2) {
         return null;
       }
 
-      const type =
-        parts[0].toLowerCase();
+      const type = parts[0].toLowerCase();
+      value = parts[1];
 
-      const value =
-        parts[1];
-
-      // --------------------------------------
-      // /profiles/765611...
-      // --------------------------------------
-
-      if (
-        type === "profiles"
-      ) {
-
-        if (
-          /^7656119\d{10}$/.test(
-            value
-          )
-        ) {
-          return value;
-        }
-
-        return null;
+      // /profiles/7656119...
+      if (type === "profiles") {
+        return isSteamId(value) ? value : null;
       }
 
-      // --------------------------------------
-      // /id/username
-      // --------------------------------------
-
-      if (
-        type !== "id"
-      ) {
+      // Нам нужен /id/...
+      if (type !== "id") {
         return null;
       }
-
-      // Теперь пытаемся определить username
-      // через Steam.
-      cleaned = value;
 
     } catch (error) {
-
-      console.error(
-        "Ошибка разбора URL:",
-        error
-      );
-
+      console.error("Ошибка URL:", error);
       return null;
     }
   }
 
-  // ========================================
-  // Вариант 3 — username через Steam redirect
-  // ========================================
+  const encoded = encodeURIComponent(value);
 
+  /*
+   * Сначала XML.
+   * Если Steam редиректит на /profiles/...
+   * response.url уже будет содержать настоящий SteamID.
+   */
   try {
-
-    const steamUrl =
-      `https://steamcommunity.com/id/${encodeURIComponent(
-        cleaned
-      )}/`;
-
-    const response =
-      await fetch(
-        steamUrl,
-        {
-          method: "GET",
-          redirect: "manual",
-
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0",
-            "Accept":
-              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-          }
-        }
-      );
-
-    // ======================================
-    // Проверяем Location
-    // ======================================
-
-    const location =
-      response.headers.get(
-        "location"
-      );
-
-    console.log(
-      "STEAM LOCATION:",
-      location
+    const response = await fetch(
+      `https://steamcommunity.com/id/${encoded}/?xml=1`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        },
+        cache: "no-store"
+      }
     );
 
-    if (location) {
+    console.log("STEAM STATUS:", response.status);
+    console.log("STEAM FINAL URL:", response.url);
 
-      const match =
-        location.match(
-          /\/profiles\/(7656119\d{10})/
-        );
+    // Проверяем конечный URL после редиректа
+    const idFromUrl = extractSteamId(response.url);
 
-      if (match) {
-        return match[1];
-      }
+    if (idFromUrl) {
+      return idFromUrl;
+    }
+
+    const body = await response.text();
+
+    // SteamID64 в XML/HTML
+    const idFromBody = extractSteamId(body);
+
+    if (idFromBody) {
+      return idFromBody;
     }
 
   } catch (error) {
-
-    console.error(
-      "Ошибка Steam redirect:",
-      error
-    );
+    console.error("Ошибка Steam XML:", error);
   }
 
-  // ========================================
-  // Вариант 4 — Steam XML
-  // ========================================
-
+  /*
+   * Дополнительный fallback:
+   * обычная страница профиля.
+   */
   try {
-
-    const xmlUrl =
-      `https://steamcommunity.com/id/${encodeURIComponent(
-        cleaned
-      )}/?xml=1`;
-
-    const response =
-      await fetch(
-        xmlUrl,
-        {
-          method: "GET",
-
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0",
-            "Accept":
-              "application/xml,text/xml,*/*"
-          },
-
-          cache: "no-store"
-        }
-      );
-
-    console.log(
-      "STEAM XML STATUS:",
-      response.status
+    const response = await fetch(
+      `https://steamcommunity.com/id/${encoded}/`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        },
+        cache: "no-store"
+      }
     );
 
-    if (response.ok) {
+    console.log("STEAM HTML STATUS:", response.status);
+    console.log("STEAM HTML URL:", response.url);
 
-      const xml =
-        await response.text();
+    const idFromUrl = extractSteamId(response.url);
 
-      // steamID64
-      let match =
-        xml.match(
-          /<steamID64>\s*(7656119\d{10})\s*<\/steamID64>/i
-        );
+    if (idFromUrl) {
+      return idFromUrl;
+    }
 
-      if (match) {
-        return match[1];
-      }
+    const html = await response.text();
 
-      // Иногда SteamID встречается
-      // просто внутри XML
-      match =
-        xml.match(
-          /(7656119\d{10})/
-        );
+    const idFromHtml = extractSteamId(html);
 
-      if (match) {
-        return match[1];
-      }
+    if (idFromHtml) {
+      return idFromHtml;
     }
 
   } catch (error) {
-
-    console.error(
-      "Ошибка Steam XML:",
-      error
-    );
+    console.error("Ошибка Steam HTML:", error);
   }
 
   return null;
 }
 
 
-// ========================================
-// Обработка ника
-// ========================================
+function extractSteamId(text) {
+  if (!text) {
+    return null;
+  }
 
-function decodeHtml(text) {
+  const match = String(text).match(
+    /7656119\d{10}/
+  );
 
-  return text
-    .replace(
-      /^<!\[CDATA\[/,
-      ""
-    )
-    .replace(
-      /\]\]>$/,
-      ""
-    )
-    .replace(
-      /&amp;/g,
-      "&"
-    )
-    .replace(
-      /&lt;/g,
-      "<"
-    )
-    .replace(
-      /&gt;/g,
-      ">"
-    )
-    .replace(
-      /&quot;/g,
-      '"'
-    )
-    .replace(
-      /&#39;/g,
-      "'"
-    )
-    .replace(
-      /&#x27;/gi,
-      "'"
-    );
+  return match ? match[0] : null;
 }
 
 
-// ========================================
-// Ранги DBD
-// ========================================
+function isSteamId(value) {
+  return /^7656119\d{10}$/.test(value);
+}
+
+
+/* =========================
+   STEAM NICKNAME
+========================= */
+
+async function getSteamNickname(steamId) {
+  try {
+    const response = await fetch(
+      `https://steamcommunity.com/profiles/${steamId}/?xml=1`,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        },
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      return "Неизвестно";
+    }
+
+    const xml = await response.text();
+
+    const match = xml.match(
+      /<steamID>([\s\S]*?)<\/steamID>/i
+    );
+
+    if (!match?.[1]) {
+      return "Неизвестно";
+    }
+
+    return decodeHtml(match[1].trim());
+
+  } catch (error) {
+    console.error("Ошибка ника:", error);
+    return "Неизвестно";
+  }
+}
+
+
+/* =========================
+   STEAM HOURS
+========================= */
+
+async function getSteamHours(steamId) {
+  try {
+    const response = await fetch(
+      `https://decapi.me/steam/hours/${encodeURIComponent(
+        steamId
+      )}/381210`,
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      return "Время игры скрыто";
+    }
+
+    const text = (await response.text()).trim();
+
+    const match = text.match(/[\d.,]+/);
+
+    if (!match) {
+      return "Время игры скрыто";
+    }
+
+    const hours = parseFloat(
+      match[0].replace(",", ".")
+    );
+
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return "Время игры скрыто";
+    }
+
+    return `${hours
+      .toFixed(1)
+      .replace(/\.0$/, "")} ч`;
+
+  } catch (error) {
+    console.error("Ошибка часов:", error);
+    return "Время игры скрыто";
+  }
+}
+
+
+/* =========================
+   DBD
+========================= */
+
+async function getDbdStats(steamId) {
+  try {
+    const response = await fetch(
+      `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
+        steamId
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+          "Accept": "application/json"
+        },
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      console.error(
+        "DBD STATUS:",
+        response.status
+      );
+
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error("Ошибка DBD API:", error);
+    return null;
+  }
+}
+
+
+/* =========================
+   HELPERS
+========================= */
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+
+function decodeHtml(text) {
+  return String(text)
+    .replace(/^<!\[CDATA\[/, "")
+    .replace(/\]\]>$/, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'");
+}
+
 
 function rankName(rank) {
-
   const ranks = {
-
     20: "Пепел IV",
     19: "Пепел III",
     18: "Пепел II",
@@ -596,10 +394,5 @@ function rankName(rank) {
     1: "Радужный I"
   };
 
-  return (
-    ranks[
-      Number(rank)
-    ] ||
-    "Неизвестно"
-  );
+  return ranks[Number(rank)] || "Неизвестно";
 }

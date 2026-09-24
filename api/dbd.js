@@ -16,27 +16,17 @@ export default async function handler(req, res) {
       );
     }
 
-    // =========================
-    // ИСХОДНЫЙ STEAMID
-    // =========================
-
-    const originalSteamInput = String(steamId);
-
-    try {
-      steamId = decodeURIComponent(
-        String(steamId)
-      );
-    } catch {}
-
     steamId = String(steamId).trim();
 
+    try {
+      steamId = decodeURIComponent(steamId);
+    } catch {}
+
     // =========================
-    // ОПРЕДЕЛЯЕМ STEAMID64
+    // ОПРЕДЕЛЯЕМ STEAMID
     // =========================
 
-    if (/^\d{17}$/.test(steamId)) {
-      // SteamID уже передан напрямую
-    } else {
+    if (!/^\d{17}$/.test(steamId)) {
       // /profiles/7656119...
       const profileMatch = steamId.match(
         /steamcommunity\.com\/profiles\/(\d{17})/i
@@ -52,10 +42,7 @@ export default async function handler(req, res) {
 
         if (!vanityMatch) {
           return res.status(400).send(
-            `❌ Не удалось определить SteamID.
-
-Получено:
-${originalSteamInput}`
+            "❌ Неверная ссылка на Steam-профиль."
           );
         }
 
@@ -65,80 +52,43 @@ ${originalSteamInput}`
           `&vanityurl=${encodeURIComponent(vanityMatch[1])}` +
           `&format=json`;
 
-        let vanityResponse;
-
         try {
-          vanityResponse =
+          const vanityResponse =
             await fetch(vanityUrl);
-        } catch (error) {
-          return res.status(502).send(
-            `❌ ResolveVanityURL: ошибка соединения.
 
-Получено:
-${originalSteamInput}
+          if (!vanityResponse.ok) {
+            return res.status(404).send(
+              "❌ Профиль скрыт"
+            );
+          }
 
-Vanity:
-${vanityMatch[1]}
-
-Ошибка:
-${error.message}`
-          );
-        }
-
-        if (!vanityResponse.ok) {
-          const body =
-            await vanityResponse.text();
-
-          return res.status(502).send(
-            `❌ ResolveVanityURL: HTTP ${vanityResponse.status}
-
-Vanity:
-${vanityMatch[1]}
-
-Ответ Steam:
-${body || "{}"}`
-          );
-        }
-
-        let vanityData;
-
-        try {
-          vanityData =
+          const vanityData =
             await vanityResponse.json();
+
+          if (
+            vanityData?.response?.success !== 1 ||
+            !vanityData?.response?.steamid
+          ) {
+            return res.status(404).send(
+              "❌ Профиль скрыт"
+            );
+          }
+
+          steamId =
+            vanityData.response.steamid;
+
         } catch {
-          return res.status(502).send(
-            "❌ ResolveVanityURL: Steam вернул некорректный JSON."
-          );
-        }
-
-        if (
-          vanityData?.response?.success !== 1 ||
-          !vanityData?.response?.steamid
-        ) {
           return res.status(404).send(
-            `❌ Steam-профиль не найден.
-
-Vanity:
-${vanityMatch[1]}
-
-Ответ Steam:
-${JSON.stringify(vanityData)}`
+            "❌ Профиль скрыт"
           );
         }
-
-        steamId =
-          vanityData.response.steamid;
       }
     }
-
-    // =========================
-    // APPID DBD
-    // =========================
 
     const appId = 381210;
 
     // =========================
-    // URL ЗАПРОСОВ
+    // STEAM API
     // =========================
 
     const profileUrl =
@@ -160,13 +110,6 @@ ${JSON.stringify(vanityData)}`
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json`;
 
-    // URL для диагностики — БЕЗ API KEY
-    const safeStatsUrl =
-      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
-      `appid=${appId}` +
-      `&steamid=${steamId}` +
-      `&format=json`;
-
     // =========================
     // ПРОФИЛЬ
     // =========================
@@ -176,36 +119,15 @@ ${JSON.stringify(vanityData)}`
     try {
       profileResponse =
         await fetch(profileUrl);
-    } catch (error) {
-      return res.status(502).send(
-        `❌ GetPlayerSummaries: ошибка соединения.
-
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-Ошибка:
-${error.message}`
+    } catch {
+      return res.status(404).send(
+        "❌ Профиль скрыт"
       );
     }
 
     if (!profileResponse.ok) {
-      const body =
-        await profileResponse.text();
-
-      return res.status(502).send(
-        `❌ GetPlayerSummaries: HTTP ${profileResponse.status}
-
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-Ответ Steam:
-${body || "{}"}`
+      return res.status(404).send(
+        "❌ Профиль скрыт"
       );
     }
 
@@ -215,11 +137,8 @@ ${body || "{}"}`
       profileData =
         await profileResponse.json();
     } catch {
-      return res.status(502).send(
-        `❌ GetPlayerSummaries: некорректный JSON.
-
-SteamID:
-${steamId}`
+      return res.status(404).send(
+        "❌ Профиль скрыт"
       );
     }
 
@@ -228,13 +147,7 @@ ${steamId}`
 
     if (!player) {
       return res.status(404).send(
-        `❌ GetPlayerSummaries: профиль не найден.
-
-SteamID:
-${steamId}
-
-Ответ Steam:
-${JSON.stringify(profileData)}`
+        "❌ Профиль скрыт"
       );
     }
 
@@ -248,28 +161,11 @@ ${JSON.stringify(profileData)}`
     let playtime =
       "Время игры скрыто";
 
-    let gamesResponse;
-
     try {
-      gamesResponse =
+      const gamesResponse =
         await fetch(gamesUrl);
-    } catch (error) {
-      return res.status(502).send(
-        `❌ GetOwnedGames: ошибка соединения.
 
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-Ошибка:
-${error.message}`
-      );
-    }
-
-    if (gamesResponse.ok) {
-      try {
+      if (gamesResponse.ok) {
         const gamesData =
           await gamesResponse.json();
 
@@ -292,14 +188,16 @@ ${error.message}`
                 dbdGame.playtime_forever
               ) / 60;
 
-            playtime =
-              `${hours.toFixed(1)} ч`;
+            if (Number.isFinite(hours)) {
+              playtime =
+                `${hours.toFixed(1)} ч`;
+            }
           }
         }
-      } catch {
-        playtime =
-          "Время игры скрыто";
       }
+    } catch {
+      playtime =
+        "Время игры скрыто";
     }
 
     // =========================
@@ -311,42 +209,15 @@ ${error.message}`
     try {
       statsResponse =
         await fetch(statsUrl);
-    } catch (error) {
-      return res.status(502).send(
-        `❌ GetUserStatsForGame: ошибка соединения.
-
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-URL без API-ключа:
-${safeStatsUrl}
-
-Ошибка:
-${error.message}`
+    } catch {
+      return res.status(404).send(
+        "❌ Профиль скрыт"
       );
     }
 
     if (!statsResponse.ok) {
-      const body =
-        await statsResponse.text();
-
-      return res.status(502).send(
-        `❌ GetUserStatsForGame: HTTP ${statsResponse.status}
-
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-URL без API-ключа:
-${safeStatsUrl}
-
-Ответ Steam:
-${body || "{}"}`
+      return res.status(404).send(
+        "❌ Профиль скрыт"
       );
     }
 
@@ -356,44 +227,27 @@ ${body || "{}"}`
       statsData =
         await statsResponse.json();
     } catch {
-      return res.status(502).send(
-        `❌ GetUserStatsForGame: некорректный JSON.
-
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-URL без API-ключа:
-${safeStatsUrl}`
-      );
-    }
-
-    if (!statsData?.playerstats) {
       return res.status(404).send(
-        `❌ GetUserStatsForGame: Steam не вернул playerstats.
-
-SteamID:
-${steamId}
-
-AppID:
-${appId}
-
-URL без API-ключа:
-${safeStatsUrl}
-
-Ответ Steam:
-${JSON.stringify(statsData)}`
+        "❌ Профиль скрыт"
       );
     }
 
-    // =========================
-    // СТАТИСТИКА
-    // =========================
+    // Steam может вернуть {}
+    // или объект без playerstats
+    if (
+      !statsData ||
+      !statsData.playerstats ||
+      !Array.isArray(
+        statsData.playerstats.stats
+      )
+    ) {
+      return res.status(404).send(
+        "❌ Профиль скрыт"
+      );
+    }
 
     const stats =
-      statsData.playerstats.stats || [];
+      statsData.playerstats.stats;
 
     function getStat(name) {
       const stat =
@@ -415,6 +269,10 @@ ${JSON.stringify(statsData)}`
         ? value
         : 0;
     }
+
+    // =========================
+    // СТАТИСТИКА
+    // =========================
 
     const killerPips =
       getStat("DBD_KillerSkulls");
@@ -507,8 +365,8 @@ ${JSON.stringify(statsData)}`
   } catch (error) {
     console.error(error);
 
-    return res.status(500).send(
-      `❌ Общая ошибка Vercel: ${error.message}`
+    return res.status(404).send(
+      "❌ Профиль скрыт"
     );
   }
 }

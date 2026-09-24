@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   try {
     // ========================================================
-    // Получаем SteamID64
+    // STEAMID64
     // ========================================================
 
     const steamId = await resolveSteamId(input);
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     }
 
     // ========================================================
-    // Получаем ник, часы и DBD одновременно
+    // НИК + ЧАСЫ STEAM + DBD
     // ========================================================
 
     const [
@@ -48,40 +48,36 @@ export default async function handler(req, res) {
 
     if (!dbd) {
       return res.status(200).send(
-        "❌ Не удалось получить статистику профиля."
+        "❌ Не удалось получить статистику профиля"
       );
     }
 
     // ========================================================
-    // Ранги
+    // РАНГИ
     // ========================================================
 
-    const survivor = rankName(
-      dbd.survivor_rank
-    );
+    const survivor =
+      rankName(dbd.survivor_rank);
 
-    const killer = rankName(
-      dbd.killer_rank
-    );
+    const killer =
+      rankName(dbd.killer_rank);
 
     // ========================================================
-    // Статистика
+    // СТАТИСТИКА
     // ========================================================
 
-    const gens = toNumber(
-      dbd.gensrepaired
-    );
+    const gens =
+      toNumber(dbd.gensrepaired);
 
-    const escapes = toNumber(
-      dbd.escaped
-    );
+    const escapes =
+      toNumber(dbd.escaped);
 
     const totalKills =
       toNumber(dbd.sacrificed) +
       toNumber(dbd.killed);
 
     // ========================================================
-    // Итог
+    // ВЫВОД
     // ========================================================
 
     const result =
@@ -102,7 +98,7 @@ export default async function handler(req, res) {
     );
 
     return res.status(200).send(
-      "❌ Не удалось получить статистику профиля."
+      "❌ Не удалось получить статистику профиля"
     );
   }
 }
@@ -130,25 +126,20 @@ function cleanInput(input) {
 async function resolveSteamId(input) {
   let value = cleanInput(input);
 
-  // ========================================================
   // Прямой SteamID64
-  // ========================================================
-
   if (isSteamId(value)) {
     return value;
   }
 
-  // ========================================================
   // Steam URL
-  // ========================================================
-
   if (/steamcommunity\.com/i.test(value)) {
     try {
       const url = new URL(value);
 
-      const parts = url.pathname
-        .split("/")
-        .filter(Boolean);
+      const parts =
+        url.pathname
+          .split("/")
+          .filter(Boolean);
 
       if (parts.length < 2) {
         return null;
@@ -185,7 +176,7 @@ async function resolveSteamId(input) {
     encodeURIComponent(value);
 
   // ========================================================
-  // 1. Steam XML
+  // 1. STEAM XML
   // ========================================================
 
   try {
@@ -236,7 +227,7 @@ async function resolveSteamId(input) {
   }
 
   // ========================================================
-  // 2. Обычная страница Steam
+  // 2. ОБЫЧНАЯ СТРАНИЦА STEAM
   // ========================================================
 
   try {
@@ -356,7 +347,7 @@ async function getSteamNickname(steamId) {
       await response.text();
 
     // ======================================================
-    // 1. og:title
+    // 1. OG TITLE
     // ======================================================
 
     let match = html.match(
@@ -375,12 +366,11 @@ async function getSteamNickname(steamId) {
           match[1].trim()
         );
 
-      nickname = nickname
-        .replace(
+      nickname =
+        nickname.replace(
           /^Steam Community\s*::\s*/i,
           ""
-        )
-        .trim();
+        ).trim();
 
       if (nickname) {
         return nickname;
@@ -388,7 +378,7 @@ async function getSteamNickname(steamId) {
     }
 
     // ======================================================
-    // 2. Старый XML steamID
+    // 2. STEAMID XML
     // ======================================================
 
     match = html.match(
@@ -401,12 +391,11 @@ async function getSteamNickname(steamId) {
           match[1].trim()
         );
 
-      nickname = nickname
-        .replace(
+      nickname =
+        nickname.replace(
           /^Steam Community\s*::\s*/i,
           ""
-        )
-        .trim();
+        ).trim();
 
       if (nickname) {
         return nickname;
@@ -414,7 +403,7 @@ async function getSteamNickname(steamId) {
     }
 
     // ======================================================
-    // 3. Title страницы
+    // 3. TITLE
     // ======================================================
 
     match = html.match(
@@ -427,16 +416,17 @@ async function getSteamNickname(steamId) {
           match[1].trim()
         );
 
-      nickname = nickname
-        .replace(
-          /^Steam Community\s*::\s*/i,
-          ""
-        )
-        .replace(
-          /\s*::\s*Steam Community.*$/i,
-          ""
-        )
-        .trim();
+      nickname =
+        nickname
+          .replace(
+            /^Steam Community\s*::\s*/i,
+            ""
+          )
+          .replace(
+            /\s*::\s*Steam Community.*$/i,
+            ""
+          )
+          .trim();
 
       if (
         nickname &&
@@ -460,7 +450,7 @@ async function getSteamNickname(steamId) {
 
 
 /* =========================================================
-   ЧАСЫ STEAM
+   ЧАСЫ — ТОЛЬКО STEAM
 ========================================================= */
 
 async function getSteamHours(steamId) {
@@ -498,8 +488,8 @@ async function getSteamHours(steamId) {
     );
 
     // ======================================================
-    // Ищем игру Dead by Daylight
-    // AppID игры = 381210
+    // Ищем Dead by Daylight
+    // AppID = 381210
     // ======================================================
 
     const gameRegex =
@@ -510,7 +500,8 @@ async function getSteamHours(steamId) {
     while (
       (match = gameRegex.exec(xml)) !== null
     ) {
-      const game = match[1];
+      const game =
+        match[1];
 
       const appIdMatch =
         game.match(
@@ -525,14 +516,14 @@ async function getSteamHours(steamId) {
       }
 
       console.log(
-        "DBD GAME FOUND"
+        "STEAM: DEAD BY DAYLIGHT FOUND"
       );
 
       // ====================================================
-      // <hoursOnRecord>
+      // Часы Steam
       // ====================================================
 
-      let hoursMatch =
+      const hoursMatch =
         game.match(
           /<hoursOnRecord>([\d.,]+)<\/hoursOnRecord>/i
         );
@@ -556,7 +547,7 @@ async function getSteamHours(steamId) {
       }
 
       // ====================================================
-      // Иногда Steam отдаёт часы как minutesOnRecord
+      // Если Steam отдаёт минуты
       // ====================================================
 
       const minutesMatch =
@@ -566,7 +557,9 @@ async function getSteamHours(steamId) {
 
       if (minutesMatch?.[1]) {
         const minutes =
-          Number(minutesMatch[1]);
+          Number(
+            minutesMatch[1]
+          );
 
         if (
           Number.isFinite(minutes) &&
@@ -584,29 +577,15 @@ async function getSteamHours(steamId) {
       return "Время игры скрыто";
     }
 
-    // ======================================================
-    // Если XML вообще не содержит games
-    // ======================================================
-
-    if (
-      !/<games>/i.test(xml)
-    ) {
-      console.log(
-        "STEAM GAMES: список игр скрыт"
-      );
-
-      return "Время игры скрыто";
-    }
-
     console.log(
-      "STEAM GAMES: DBD не найден"
+      "STEAM: DBD НЕ НАЙДЕН"
     );
 
     return "Время игры скрыто";
 
   } catch (error) {
     console.error(
-      "Ошибка получения часов Steam:",
+      "Ошибка получения часов из Steam:",
       error
     );
 
@@ -627,7 +606,7 @@ async function getDbdStats(steamId) {
 
   try {
     // ======================================================
-    // 1. Обычный запрос статистики
+    // 1. Обычный запрос
     // ======================================================
 
     const response = await fetch(
@@ -670,8 +649,7 @@ async function getDbdStats(steamId) {
     }
 
     // ======================================================
-    // 2. Если статистики нет,
-    //    делаем profile-запрос
+    // 2. PROFILE REQUEST
     // ======================================================
 
     const profileUrl =
@@ -721,7 +699,7 @@ async function getDbdStats(steamId) {
     }
 
     // ======================================================
-    // 3. Повторный запрос статистики
+    // 3. Повторный запрос
     // ======================================================
 
     try {

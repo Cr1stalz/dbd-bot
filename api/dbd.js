@@ -413,10 +413,6 @@ async function getSteamNickname(steamId) {
 
     /*
      * 2. Steam XML
-     *
-     * Например:
-     *
-     * <steamID><![CDATA[Cr1stalz_]]></steamID>
      */
     match =
       html.match(
@@ -626,8 +622,9 @@ async function getSteamHours(steamId) {
  * 2. если profile говорит PRIVATE:
  *       сразу private
  * 3. иначе playerstats
- *
- * НУЛИ НЕ СЧИТАЮТСЯ PRIVATE!
+ * 4. если playerstats содержит
+ *    больше 10 нулевых значений:
+ *       PRIVATE
  * ==========================================
  */
 
@@ -677,7 +674,7 @@ async function getDbdStats(steamId) {
   ) {
 
     console.log(
-      ">>> DBD PRIVATE DETECTED <<<"
+      ">>> DBD PRIVATE DETECTED BY PROFILE <<<"
     );
 
     return {
@@ -722,19 +719,7 @@ async function getDbdStats(steamId) {
 
 
   /*
-   * ВАЖНО:
-   *
-   * Здесь НЕ проверяем нули.
-   *
-   * Например:
-   *
-   * survivor_rank = 20
-   * killer_rank = 20
-   * gensrepaired = 0
-   * escaped = 0
-   * killed = 0
-   *
-   * это валидный ответ и он НЕ private.
+   * Обрабатываем JSON.
    */
   return parseDbdResponse(
     stats
@@ -744,9 +729,7 @@ async function getDbdStats(steamId) {
 
 /*
  * ==========================================
- * ПРОВЕРКА PRIVATE
- *
- * Только по явному сообщению API
+ * ПРОВЕРКА PRIVATE ПО PROFILE API
  * ==========================================
  */
 
@@ -779,12 +762,9 @@ function isDbdPrivateProfile(data) {
   /*
    * Основной ответ Tricky:
    *
-   * {
-   *   "result": 0,
-   *   "steamid": "...",
-   *   "message":
-   *   "We don't have any stats for this profile, it appears to be private."
-   * }
+   * result = 0
+   * message содержит:
+   * "appears to be private"
    */
   if (
     Number(data.result) === 0 &&
@@ -820,11 +800,6 @@ function isDbdPrivateProfile(data) {
   }
 
 
-  /*
-   * ВАЖНО:
-   *
-   * Никакие нули здесь не проверяем.
-   */
   return false;
 }
 
@@ -914,6 +889,8 @@ async function fetchJson(url) {
 /*
  * ==========================================
  * ОБРАБОТКА PLAYERSTATS
+ *
+ * > 10 НУЛЕЙ = PRIVATE
  * ==========================================
  */
 
@@ -928,11 +905,11 @@ function parseDbdResponse(data) {
 
 
   /*
-   * Если сам playerstats неожиданно
-   * вернул сообщение private.
-   *
-   * Это отдельная защита.
+   * ========================================
+   * PRIVATE ПО СООБЩЕНИЮ API
+   * ========================================
    */
+
   const message =
     String(
       data.message || ""
@@ -949,6 +926,10 @@ function parseDbdResponse(data) {
     message === "private"
   ) {
 
+    console.log(
+      ">>> DBD PRIVATE BY MESSAGE <<<"
+    );
+
     return {
       private: true
     };
@@ -956,10 +937,45 @@ function parseDbdResponse(data) {
 
 
   /*
-   * result = 0 БЕЗ private
+   * ========================================
+   * СЧИТАЕМ НУЛИ ВО ВСЁМ JSON
+   * ========================================
+   */
+
+  const zeroCount =
+    countZerosInJson(data);
+
+  console.log(
+    "DBD ZERO COUNT:",
+    zeroCount
+  );
+
+
+  /*
+   * ========================================
+   * БОЛЬШЕ 10 НУЛЕЙ = PRIVATE
    *
-   * Не считаем это автоматически ошибкой,
-   * если есть статистические поля.
+   * 10  -> НЕ private
+   * 11+ -> private
+   * ========================================
+   */
+
+  if (zeroCount > 10) {
+
+    console.log(
+      ">>> DBD PRIVATE: MORE THAN 10 ZEROS <<<"
+    );
+
+    return {
+      private: true
+    };
+  }
+
+
+  /*
+   * ========================================
+   * ПРОВЕРЯЕМ НАЛИЧИЕ СТАТИСТИКИ
+   * ========================================
    */
 
   const hasStats =
@@ -979,10 +995,78 @@ function parseDbdResponse(data) {
 
 
   /*
-   * Возвращаем данные даже если
-   * все значения равны 0.
+   * Нулевые значения разрешены,
+   * если их 10 или меньше.
    */
   return data;
+}
+
+
+/*
+ * ==========================================
+ * ПОДСЧЁТ НУЛЕЙ В JSON
+ * ==========================================
+ */
+
+function countZerosInJson(data) {
+
+  let count = 0;
+
+
+  function walk(value) {
+
+    /*
+     * Числовой 0
+     */
+    if (value === 0) {
+      count++;
+      return;
+    }
+
+
+    /*
+     * Строковый "0"
+     */
+    if (
+      typeof value === "string" &&
+      value.trim() === "0"
+    ) {
+      count++;
+      return;
+    }
+
+
+    /*
+     * Массив
+     */
+    if (Array.isArray(value)) {
+
+      for (const item of value) {
+        walk(item);
+      }
+
+      return;
+    }
+
+
+    /*
+     * Объект
+     */
+    if (
+      value !== null &&
+      typeof value === "object"
+    ) {
+
+      for (const key of Object.keys(value)) {
+        walk(value[key]);
+      }
+    }
+  }
+
+
+  walk(data);
+
+  return count;
 }
 
 

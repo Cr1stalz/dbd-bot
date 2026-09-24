@@ -11,79 +11,120 @@ export default async function handler(req, res) {
       return res.status(400).send("❌ SteamID не настроен.");
     }
 
-    // Steam API: профиль
     const profileUrl =
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/` +
       `?key=${encodeURIComponent(apiKey)}` +
       `&steamids=${encodeURIComponent(steamId)}`;
 
-    // Steam API: список игр и время
     const gamesUrl =
       `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/` +
       `?key=${encodeURIComponent(apiKey)}` +
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json&include_appinfo=true`;
 
-    const [profileResponse, gamesResponse] = await Promise.all([
-      fetch(profileUrl),
-      fetch(gamesUrl)
-    ]);
+    const statsUrl =
+      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/` +
+      `?appid=381210` +
+      `&key=${encodeURIComponent(apiKey)}` +
+      `&steamid=${encodeURIComponent(steamId)}` +
+      `&format=json`;
 
-    if (!profileResponse.ok || !gamesResponse.ok) {
+    const [profileResponse, gamesResponse, statsResponse] =
+      await Promise.all([
+        fetch(profileUrl),
+        fetch(gamesUrl),
+        fetch(statsUrl)
+      ]);
+
+    if (
+      !profileResponse.ok ||
+      !gamesResponse.ok ||
+      !statsResponse.ok
+    ) {
       return res.status(502).send("❌ Ошибка Steam API.");
     }
 
     const profileData = await profileResponse.json();
     const gamesData = await gamesResponse.json();
+    const statsData = await statsResponse.json();
 
-    // =========================
-    // НИК
-    // =========================
-
-    const player = profileData?.response?.players?.[0];
+    const player =
+      profileData?.response?.players?.[0];
 
     const nickname =
       player?.personaname || "Steam";
 
-    // =========================
-    // ВРЕМЯ ИГРЫ
-    // =========================
-
-    const games = gamesData?.response?.games;
+    const games =
+      gamesData?.response?.games;
 
     let playtime = "Время игры скрыто";
 
     if (Array.isArray(games)) {
       const dbdGame = games.find(
-        (game) => Number(game.appid) === 381210
+        game => Number(game.appid) === 381210
       );
 
-      if (dbdGame && dbdGame.playtime_forever != null) {
+      if (
+        dbdGame &&
+        dbdGame.playtime_forever != null
+      ) {
         const hours =
           Number(dbdGame.playtime_forever) / 60;
 
-        playtime = `${hours.toFixed(1)} ч`;
+        playtime =
+          `${hours.toFixed(1)} ч`;
       }
     }
 
-    // =========================
-    // РАНГИ
-    // =========================
-    //
-    // Steam Web API не отдаёт текущий
-    // ранг убийцы/выжившего DBD.
-    //
-    // Пока оставляем "—".
-    // Когда подключим источник рангов,
-    // эти значения будут автоматически заменены.
-    //
+    const stats =
+      statsData?.playerstats?.stats || [];
 
-    const killerRank = "—";
-    const survivorRank = "—";
+    function getStat(name) {
+      const stat = stats.find(
+        item => item.name === name
+      );
 
-    // =========================
-    // ОТВЕТ
-    // =========================
+      return stat ? Number(stat.value) : null;
+    }
+
+    const killerSkulls =
+      getStat("DBD_KillerSkulls");
+
+    const survivorSkulls =
+      getStat("DBD_CamperSkulls");
+
+    function getGrade(skulls) {
+      if (skulls == null) {
+        return "—";
+      }
+
+      if (skulls <= 4) return "Бронза IV";
+      if (skulls <= 8) return "Бронза III";
+      if (skulls <= 12) return "Бронза II";
+      if (skulls <= 16) return "Бронза I";
+
+      if (skulls <= 21) return "Серебро IV";
+      if (skulls <= 26) return "Серебро III";
+      if (skulls <= 31) return "Серебро II";
+      if (skulls <= 36) return "Серебро I";
+
+      if (skulls <= 41) return "Золото IV";
+      if (skulls <= 46) return "Золото III";
+      if (skulls <= 51) return "Золото II";
+      if (skulls <= 56) return "Золото I";
+
+      if (skulls <= 61) return "Радужный IV";
+      if (skulls <= 66) return "Радужный III";
+      if (skulls <= 71) return "Радужный II";
+
+      return "Радужный I";
+    }
+
+    const killerRank =
+      getGrade(killerSkulls);
+
+    const survivorRank =
+      getGrade(survivorSkulls);
 
     const message =
       `👤 ${nickname}` +

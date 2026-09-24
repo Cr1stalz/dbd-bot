@@ -161,4 +161,3 @@ export default async function handler(req, res) {
       .send("❌ Ошибка при получении данных.");
   }
 }
-```

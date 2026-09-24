@@ -12,19 +12,19 @@ export default async function handler(req, res) {
     }
 
     const profileUrl =
-      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/` +
-      `?key=${encodeURIComponent(apiKey)}` +
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?` +
+      `key=${encodeURIComponent(apiKey)}` +
       `&steamids=${encodeURIComponent(steamId)}`;
 
     const gamesUrl =
-      `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/` +
-      `?key=${encodeURIComponent(apiKey)}` +
+      `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?` +
+      `key=${encodeURIComponent(apiKey)}` +
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json&include_appinfo=true`;
 
     const statsUrl =
-      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/` +
-      `?appid=381210` +
+      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
+      `appid=381210` +
       `&key=${encodeURIComponent(apiKey)}` +
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json`;
@@ -36,11 +36,7 @@ export default async function handler(req, res) {
         fetch(statsUrl)
       ]);
 
-    if (
-      !profileResponse.ok ||
-      !gamesResponse.ok ||
-      !statsResponse.ok
-    ) {
+    if (!profileResponse.ok || !gamesResponse.ok || !statsResponse.ok) {
       return res.status(502).send("❌ Ошибка Steam API.");
     }
 
@@ -48,14 +44,18 @@ export default async function handler(req, res) {
     const gamesData = await gamesResponse.json();
     const statsData = await statsResponse.json();
 
-    const player =
-      profileData?.response?.players?.[0];
+    // =========================
+    // ИМЯ
+    // =========================
 
-    const nickname =
-      player?.personaname || "Steam";
+    const player = profileData?.response?.players?.[0];
+    const nickname = player?.personaname || "Steam";
 
-    const games =
-      gamesData?.response?.games;
+    // =========================
+    // ВРЕМЯ ИГРЫ
+    // =========================
+
+    const games = gamesData?.response?.games;
 
     let playtime = "Время игры скрыто";
 
@@ -68,63 +68,73 @@ export default async function handler(req, res) {
         dbdGame &&
         dbdGame.playtime_forever != null
       ) {
-        const hours =
-          Number(dbdGame.playtime_forever) / 60;
-
-        playtime =
-          `${hours.toFixed(1)} ч`;
+        const hours = Number(dbdGame.playtime_forever) / 60;
+        playtime = `${hours.toFixed(1)} ч`;
       }
     }
 
-    const stats =
-      statsData?.playerstats?.stats || [];
+    // =========================
+    // STEAM СТАТИСТИКА DBD
+    // =========================
+
+    const stats = statsData?.playerstats?.stats || [];
 
     function getStat(name) {
-      const stat = stats.find(
-        item => item.name === name
-      );
+      const stat = stats.find(item => item.name === name);
 
-      return stat ? Number(stat.value) : null;
-    }
-
-    const killerSkulls =
-      getStat("DBD_KillerSkulls");
-
-    const survivorSkulls =
-      getStat("DBD_CamperSkulls");
-
-    function getGrade(skulls) {
-      if (skulls == null) {
-        return "—";
+      if (!stat || stat.value == null) {
+        return null;
       }
 
-      if (skulls <= 4) return "Бронза IV";
-      if (skulls <= 8) return "Бронза III";
-      if (skulls <= 12) return "Бронза II";
-      if (skulls <= 16) return "Бронза I";
+      const value = Number(stat.value);
 
-      if (skulls <= 21) return "Серебро IV";
-      if (skulls <= 26) return "Серебро III";
-      if (skulls <= 31) return "Серебро II";
-      if (skulls <= 36) return "Серебро I";
-
-      if (skulls <= 41) return "Золото IV";
-      if (skulls <= 46) return "Золото III";
-      if (skulls <= 51) return "Золото II";
-      if (skulls <= 56) return "Золото I";
-
-      if (skulls <= 61) return "Радужный IV";
-      if (skulls <= 66) return "Радужный III";
-      if (skulls <= 71) return "Радужный II";
-
-      return "Радужный I";
+      return Number.isFinite(value) ? value : null;
     }
 
-    const killerRank =
-      getGrade(killerSkulls);
+    // Настоящие поля Grade.
+    const killerGradeValue =
+      getStat("DBD_SlasherTierIncrement");
 
-    const survivorRank =
-      getGrade(survivorSkulls);
+    const survivorGradeValue =
+      getStat("DBD_UnlockRanking");
+
+    // =========================
+    // GRADE
+    // =========================
+
+    /*
+      Steam хранит Grade как числовое значение.
+
+      ВАЖНО:
+      DBD_KillerSkulls и DBD_CamperSkulls здесь
+      специально НЕ используются.
+
+      Если Steam не отдаёт соответствующее поле,
+      показываем "Нет данных", а не выдумываем Grade.
+    */
+
+    function getGrade(value) {
+      if (value === null) {
+        return "Нет данных";
+      }
+
+      /*
+        На этом этапе не делаем неправильное
+        преобразование большого накопительного значения
+        напрямую в Bronze/Silver/Gold.
+
+        Значение сохраняем для диагностики.
+      */
+
+      return `Steam: ${value}`;
+    }
+
+    const killerRank = getGrade(killerGradeValue);
+    const survivorRank = getGrade(survivorGradeValue);
+
+    // =========================
+    // ОТВЕТ
+    // =========================
 
     const message =
       `👤 ${nickname}` +
@@ -147,8 +157,8 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error(error);
 
-    return res.status(500).send(
-      "❌ Ошибка при получении данных."
-    );
+    return res
+      .status(500)
+      .send("❌ Ошибка при получении данных.");
   }
 }

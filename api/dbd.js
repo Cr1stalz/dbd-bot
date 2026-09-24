@@ -3,45 +3,46 @@ export default async function handler(req, res) {
     const apiKey = process.env.STEAM_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).send("❌ STEAM_API_KEY не настроен.");
+      return res.status(500).send(
+        "❌ STEAM_API_KEY не настроен."
+      );
     }
 
     let steamId = req.query.steamid || process.env.STEAM_ID;
 
     if (!steamId) {
-      return res.status(400).send("❌ Steam-профиль не указан.");
+      return res.status(400).send(
+        "❌ Steam-профиль не указан."
+      );
     }
 
     steamId = String(steamId);
 
-    // Если передан прямой SteamID
+    try {
+      steamId = decodeURIComponent(steamId);
+    } catch {}
+
+    // SteamID64 напрямую
     if (/^\d{17}$/.test(steamId)) {
-      // Уже правильный SteamID
+      // Всё нормально
     } else {
-      // Если передана ссылка на профиль
-      let profileUrl = steamId;
-
-      try {
-        profileUrl = decodeURIComponent(profileUrl);
-      } catch {}
-
-      // Профиль вида /profiles/7656119...
-      const profileMatch = profileUrl.match(
-        /steamcommunity\.com\/profiles\/(\d{17})/
+      // /profiles/7656119...
+      const profileMatch = steamId.match(
+        /steamcommunity\.com\/profiles\/(\d{17})/i
       );
 
       if (profileMatch) {
         steamId = profileMatch[1];
       } else {
-        // Профиль вида /id/username
-        const vanityMatch = profileUrl.match(
+        // /id/username
+        const vanityMatch = steamId.match(
           /steamcommunity\.com\/id\/([^/?#]+)/i
         );
 
         if (!vanityMatch) {
-          return res
-            .status(400)
-            .send("❌ Неверная ссылка на Steam-профиль.");
+          return res.status(400).send(
+            "❌ Не удалось найти SteamID в переданной ссылке."
+          );
         }
 
         const vanityUrl =
@@ -50,44 +51,55 @@ export default async function handler(req, res) {
           `&vanityurl=${encodeURIComponent(vanityMatch[1])}` +
           `&format=json`;
 
-        const vanityResponse = await fetch(vanityUrl);
+        let vanityResponse;
 
-        if (!vanityResponse.ok) {
-          return res
-            .status(502)
-            .send("❌ Steam не смог определить профиль.");
+        try {
+          vanityResponse = await fetch(vanityUrl);
+        } catch (error) {
+          return res.status(502).send(
+            `❌ ResolveVanityURL: ошибка соединения: ${error.message}`
+          );
         }
 
-        const vanityData = await vanityResponse.json();
+        if (!vanityResponse.ok) {
+          return res.status(502).send(
+            `❌ ResolveVanityURL: HTTP ${vanityResponse.status}`
+          );
+        }
+
+        const vanityData =
+          await vanityResponse.json();
 
         if (
           vanityData?.response?.success !== 1 ||
           !vanityData?.response?.steamid
         ) {
-          return res
-            .status(404)
-            .send("❌ Steam-профиль не найден.");
+          return res.status(404).send(
+            "❌ Steam-профиль по указанной ссылке не найден."
+          );
         }
 
-        steamId = vanityData.response.steamid;
+        steamId =
+          vanityData.response.steamid;
       }
     }
 
-    // Профиль Steam
+    // =========================
+    // STEAM API URL
+    // =========================
+
     const profileUrl =
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?` +
       `key=${encodeURIComponent(apiKey)}` +
       `&steamids=${encodeURIComponent(steamId)}` +
       `&format=json`;
 
-    // Игры и время
     const gamesUrl =
       `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?` +
       `key=${encodeURIComponent(apiKey)}` +
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json&include_appinfo=true`;
 
-    // Статы DBD
     const statsUrl =
       `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
       `appid=381210` +
@@ -95,76 +107,184 @@ export default async function handler(req, res) {
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json`;
 
-    const [
-      profileResponse,
-      gamesResponse,
-      statsResponse
-    ] = await Promise.all([
-      fetch(profileUrl),
-      fetch(gamesUrl),
-      fetch(statsUrl)
-    ]);
+    // =========================
+    // ПРОФИЛЬ
+    // =========================
 
-    if (!profileResponse.ok || !statsResponse.ok) {
-      return res.status(502).send("❌ Ошибка Steam API.");
+    let profileResponse;
+
+    try {
+      profileResponse =
+        await fetch(profileUrl);
+    } catch (error) {
+      return res.status(502).send(
+        `❌ GetPlayerSummaries: ошибка соединения: ${error.message}`
+      );
     }
 
-    const profileData = await profileResponse.json();
-    const statsData = await statsResponse.json();
+    if (!profileResponse.ok) {
+      const body =
+        await profileResponse.text();
 
-    // Никнейм
-    const player = profileData?.response?.players?.[0];
-    const nickname = player?.personaname || "Steam";
+      return res.status(502).send(
+        `❌ GetPlayerSummaries: HTTP ${profileResponse.status}. ${body}`
+      );
+    }
 
-    // Время игры
-    let playtime = "Время игры скрыто";
+    let profileData;
 
-    if (gamesResponse.ok) {
-      const gamesData = await gamesResponse.json();
-      const games = gamesData?.response?.games;
+    try {
+      profileData =
+        await profileResponse.json();
+    } catch {
+      return res.status(502).send(
+        "❌ GetPlayerSummaries: Steam вернул некорректный JSON."
+      );
+    }
+
+    const player =
+      profileData?.response?.players?.[0];
+
+    if (!player) {
+      return res.status(404).send(
+        "❌ GetPlayerSummaries: профиль не найден или закрыт."
+      );
+    }
+
+    const nickname =
+      player.personaname || "Steam";
+
+    // =========================
+    // ИГРЫ / ВРЕМЯ
+    // =========================
+
+    let playtime =
+      "Время игры скрыто";
+
+    let gamesResponse;
+
+    try {
+      gamesResponse =
+        await fetch(gamesUrl);
+    } catch (error) {
+      return res.status(502).send(
+        `❌ GetOwnedGames: ошибка соединения: ${error.message}`
+      );
+    }
+
+    if (!gamesResponse.ok) {
+      return res.status(502).send(
+        `❌ GetOwnedGames: HTTP ${gamesResponse.status}`
+      );
+    }
+
+    try {
+      const gamesData =
+        await gamesResponse.json();
+
+      const games =
+        gamesData?.response?.games;
 
       if (Array.isArray(games)) {
-        const dbdGame = games.find(
-          game => Number(game.appid) === 381210
-        );
+        const dbdGame =
+          games.find(
+            game => Number(game.appid) === 381210
+          );
 
-        if (dbdGame && dbdGame.playtime_forever != null) {
+        if (
+          dbdGame &&
+          dbdGame.playtime_forever != null
+        ) {
           const hours =
-            Number(dbdGame.playtime_forever) / 60;
+            Number(
+              dbdGame.playtime_forever
+            ) / 60;
 
-          playtime = `${hours.toFixed(1)} ч`;
+          playtime =
+            `${hours.toFixed(1)} ч`;
         }
       }
+    } catch {
+      return res.status(502).send(
+        "❌ GetOwnedGames: Steam вернул некорректный JSON."
+      );
     }
 
-    // Получаем статы
+    // =========================
+    // DBD СТАТИСТИКА
+    // =========================
+
+    let statsResponse;
+
+    try {
+      statsResponse =
+        await fetch(statsUrl);
+    } catch (error) {
+      return res.status(502).send(
+        `❌ GetUserStatsForGame: ошибка соединения: ${error.message}`
+      );
+    }
+
+    if (!statsResponse.ok) {
+      const body =
+        await statsResponse.text();
+
+      return res.status(502).send(
+        `❌ GetUserStatsForGame: HTTP ${statsResponse.status}. ${body}`
+      );
+    }
+
+    let statsData;
+
+    try {
+      statsData =
+        await statsResponse.json();
+    } catch {
+      return res.status(502).send(
+        "❌ GetUserStatsForGame: Steam вернул некорректный JSON."
+      );
+    }
+
+    if (!statsData?.playerstats) {
+      return res.status(404).send(
+        "❌ GetUserStatsForGame: Steam не вернул статистику DBD."
+      );
+    }
+
     const stats =
-      statsData?.playerstats?.stats || [];
+      statsData.playerstats.stats || [];
 
     function getStat(name) {
-      const stat = stats.find(
-        item => item.name === name
-      );
+      const stat =
+        stats.find(
+          item => item.name === name
+        );
 
-      if (!stat || stat.value == null) {
+      if (
+        !stat ||
+        stat.value == null
+      ) {
         return 0;
       }
 
-      const value = Number(stat.value);
+      const value =
+        Number(stat.value);
 
       return Number.isFinite(value)
         ? value
         : 0;
     }
 
-    // Пипы
+    // =========================
+    // СТАТИСТИКА
+    // =========================
+
     const killerPips =
       getStat("DBD_KillerSkulls");
 
     const survivorPips =
       getStat("DBD_CamperSkulls");
 
-    // Убийства + жертвы
     const killed =
       getStat("DBD_KilledCampers");
 
@@ -174,15 +294,18 @@ export default async function handler(req, res) {
     const totalKills =
       killed + sacrificed;
 
-    // Генераторы
     const generators =
       getStat("DBD_GeneratorPct_float");
 
-    // Максимальный престиж
     const maxPrestige =
-      getStat("DBD_BloodwebMaxPrestigeLevel");
+      getStat(
+        "DBD_BloodwebMaxPrestigeLevel"
+      );
 
-    // Полная шкала из 20 рангов
+    // =========================
+    // РАНГИ
+    // =========================
+
     function getRank(pips) {
       if (pips <= 2) return "Пепел IV";
       if (pips <= 5) return "Пепел III";
@@ -217,7 +340,10 @@ export default async function handler(req, res) {
     const survivorRank =
       getRank(survivorPips);
 
-    // Итог
+    // =========================
+    // ИТОГ
+    // =========================
+
     const message =
       `👤 ${nickname}` +
       ` | ⏱ ${playtime}` +
@@ -234,7 +360,7 @@ export default async function handler(req, res) {
 
     res.setHeader(
       "Cache-Control",
-      "s-maxage=60, stale-while-revalidate=300"
+      "no-store"
     );
 
     return res
@@ -244,8 +370,8 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error(error);
 
-    return res
-      .status(500)
-      .send("❌ Ошибка при получении данных.");
+    return res.status(500).send(
+      `❌ Общая ошибка Vercel: ${error.message}`
+    );
   }
 }

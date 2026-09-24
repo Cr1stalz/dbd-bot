@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   if (!input) {
     return res.status(200).send(
-      "⚠️ Укажите SteamID, ник или ссылку на профиль!"
+      "⚠️ Укажите SteamID или ссылку на профиль!"
     );
   }
 

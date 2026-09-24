@@ -31,9 +31,7 @@ export default async function handler(req, res) {
   function getGrade(pips) {
     pips = Number(pips) || 0;
 
-    if (pips < 0) {
-      pips = 0;
-    }
+    if (pips < 0) pips = 0;
 
     if (pips <= 2) return "Пепел IV";
     if (pips <= 5) return "Пепел III";
@@ -169,7 +167,6 @@ export default async function handler(req, res) {
 
     const profileResponse = await fetch(profileUrl);
 
-    // Сам профиль недоступен
     if (!profileResponse.ok) {
       res.status(200).send("❌ Профиль скрыт");
       return;
@@ -194,7 +191,11 @@ export default async function handler(req, res) {
     const nickname = player.personaname || "Неизвестно";
 
     // ==============================
-    // Получаем время игры
+    // Получаем время игры DBD
+    //
+    // Dead by Daylight — бесплатная игра.
+    // Поэтому обязательно:
+    // include_played_free_games=1
     // ==============================
     let playtimeHours = null;
 
@@ -204,16 +205,19 @@ export default async function handler(req, res) {
         `?key=${encodeURIComponent(API_KEY)}` +
         `&steamid=${encodeURIComponent(steamId)}` +
         `&format=json` +
-        `&include_appinfo=true`;
+        `&include_played_free_games=1` +
+        `&include_appinfo=0` +
+        `&appids_filter[0]=381210`;
 
       const gamesResponse = await fetch(gamesUrl);
 
       if (gamesResponse.ok) {
         const gamesData = await gamesResponse.json();
 
-        const dbdGame = gamesData?.response?.games?.find(
-          game => Number(game.appid) === 381210
-        );
+        const dbdGame =
+          gamesData?.response?.games?.find(
+            game => Number(game.appid) === 381210
+          );
 
         if (
           dbdGame &&
@@ -227,9 +231,6 @@ export default async function handler(req, res) {
       playtimeHours = null;
     }
 
-    // ==============================
-    // Текст времени
-    // ==============================
     const playtimeText =
       playtimeHours !== null
         ? `⏱ ${playtimeHours.toFixed(1)} ч`
@@ -255,9 +256,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ==============================
-    // DBD статистика недоступна
-    // ==============================
     if (!statsResponse.ok) {
       res.status(200).send(
         `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
@@ -265,9 +263,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ==============================
-    // Читаем JSON статистики
-    // ==============================
     let statsData;
 
     try {
@@ -279,9 +274,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ==============================
-    // Steam вернул пустой объект
-    // ==============================
     if (
       !statsData ||
       !statsData.playerstats ||
@@ -369,24 +361,12 @@ export default async function handler(req, res) {
       ` | 🏃 Побеги: ${escapes}` +
       ` | ⭐ Макс. престиж: ${maxPrestige}` +
       ` | ⚙️ Генераторов: ${generators}` +
-      ` | 🩸 Очки крови (всего): ${formatNumber(bloodpoints)}`;
+      ` | 🩸 Очки крови: ${formatNumber(bloodpoints)}`;
 
-    // ==============================
-    // Ответ для Moobot
-    // ==============================
     res.status(200).send(result);
 
   } catch (error) {
     console.error(error);
-
-    // Если профиль уже определён,
-    // но произошла ошибка при получении DBD
-    if (typeof nickname !== "undefined") {
-      res.status(200).send(
-        `👤 ${nickname} | ⏱ Время игры скрыто | 🎮 Игры скрыты`
-      );
-      return;
-    }
 
     res.status(200).send("❌ Профиль скрыт");
   }

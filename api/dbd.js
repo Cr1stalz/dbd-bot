@@ -26,41 +26,38 @@ export default async function handler(req, res) {
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json&include_appinfo=true`;
 
-    // =========================
-    // NIGHTLIGHT API
-    // =========================
-
-    const survivorGradeUrl =
-      `https://api.nightlight.gg/v1/steam-stats/${encodeURIComponent(steamId)}/stats/survivor_grade?format=plain`;
-
-    const killerGradeUrl =
-      `https://api.nightlight.gg/v1/steam-stats/${encodeURIComponent(steamId)}/stats/killer_grade?format=plain`;
+    const statsUrl =
+      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
+      `appid=381210` +
+      `&key=${encodeURIComponent(apiKey)}` +
+      `&steamid=${encodeURIComponent(steamId)}` +
+      `&format=json`;
 
     const [
       profileResponse,
       gamesResponse,
-      survivorGradeResponse,
-      killerGradeResponse
+      statsResponse
     ] = await Promise.all([
       fetch(profileUrl),
       fetch(gamesUrl),
-      fetch(survivorGradeUrl),
-      fetch(killerGradeUrl)
+      fetch(statsUrl)
     ]);
 
-    // Steam profile обязателен.
-    if (!profileResponse.ok) {
+    if (!profileResponse.ok || !statsResponse.ok) {
       return res.status(502).send("❌ Ошибка Steam API.");
     }
 
     const profileData = await profileResponse.json();
+    const statsData = await statsResponse.json();
 
     // =========================
     // ИМЯ
     // =========================
 
     const player = profileData?.response?.players?.[0];
-    const nickname = player?.personaname || "Steam";
+
+    const nickname =
+      player?.personaname || "Steam";
 
     // =========================
     // ВРЕМЯ ИГРЫ
@@ -81,34 +78,74 @@ export default async function handler(req, res) {
           dbdGame &&
           dbdGame.playtime_forever != null
         ) {
-          const hours = Number(dbdGame.playtime_forever) / 60;
+          const hours =
+            Number(dbdGame.playtime_forever) / 60;
+
           playtime = `${hours.toFixed(1)} ч`;
         }
       }
     }
 
     // =========================
-    // GRADE
+    // СТАТИСТИКА DBD
     // =========================
 
-    let killerRank = "Нет данных";
-    let survivorRank = "Нет данных";
+    const stats =
+      statsData?.playerstats?.stats || [];
 
-    if (killerGradeResponse.ok) {
-      const text = (await killerGradeResponse.text()).trim();
+    function getStat(name) {
+      const stat = stats.find(
+        item => item.name === name
+      );
 
-      if (text && !text.startsWith("{")) {
-        killerRank = translateGrade(text);
+      if (!stat || stat.value == null) {
+        return 0;
       }
+
+      const value = Number(stat.value);
+
+      return Number.isFinite(value)
+        ? value
+        : 0;
     }
 
-    if (survivorGradeResponse.ok) {
-      const text = (await survivorGradeResponse.text()).trim();
+    // =========================
+    // РАНГОВЫЕ ПИПСЫ
+    // =========================
 
-      if (text && !text.startsWith("{")) {
-        survivorRank = translateGrade(text);
-      }
-    }
+    const killerPips =
+      getStat("DBD_KillerSkulls");
+
+    const survivorPips =
+      getStat("DBD_CamperSkulls");
+
+    // =========================
+    // ОСНОВНАЯ СТАТИСТИКА
+    // =========================
+
+    const killed =
+      getStat("DBD_KilledCampers");
+
+    const sacrificed =
+      getStat("DBD_SacrificedCampers");
+
+    const escapes =
+      getStat("DBD_Escape");
+
+    const hatchEscapes =
+      getStat("DBD_EscapeThroughHatch");
+
+    const skillChecks =
+      getStat("DBD_SkillCheckSuccess");
+
+    const unhooks =
+      getStat("DBD_UnhookOrHeal");
+
+    const generators =
+      getStat("DBD_GeneratorPct_float");
+
+    const bloodwebPrestige =
+      getStat("DBD_BloodwebMaxPrestigeLevel");
 
     // =========================
     // ОТВЕТ
@@ -117,8 +154,16 @@ export default async function handler(req, res) {
     const message =
       `👤 ${nickname}` +
       ` | ⏱ ${playtime}` +
-      ` | 🔪 ${killerRank}` +
-      ` | 🧑 ${survivorRank}`;
+      ` | 🔪 Пипсы убийцы: ${killerPips}` +
+      ` | 🧑 Пипсы выжившего: ${survivorPips}` +
+      ` | ☠️ Убито: ${killed}` +
+      ` | 🪝 Принесено в жертву: ${sacrificed}` +
+      ` | 🚪 Побегов: ${escapes}` +
+      ` | 🕳️ Через люк: ${hatchEscapes}` +
+      ` | 🎯 Скиллчеков: ${skillChecks}` +
+      ` | ❤️ Лечений/анхуков: ${unhooks}` +
+      ` | ⚙️ Генераторов: ${generators.toFixed(1)}` +
+      ` | 🩸 Престиж: ${bloodwebPrestige}`;
 
     res.setHeader(
       "Content-Type",
@@ -139,40 +184,4 @@ export default async function handler(req, res) {
       .status(500)
       .send("❌ Ошибка при получении данных.");
   }
-}
-
-
-// =========================
-// ПЕРЕВОД GRADE НА РУССКИЙ
-// =========================
-
-function translateGrade(grade) {
-  const grades = {
-    "Ash IV": "Пепел IV",
-    "Ash III": "Пепел III",
-    "Ash II": "Пепел II",
-    "Ash I": "Пепел I",
-
-    "Bronze IV": "Бронза IV",
-    "Bronze III": "Бронза III",
-    "Bronze II": "Бронза II",
-    "Bronze I": "Бронза I",
-
-    "Silver IV": "Серебро IV",
-    "Silver III": "Серебро III",
-    "Silver II": "Серебро II",
-    "Silver I": "Серебро I",
-
-    "Gold IV": "Золото IV",
-    "Gold III": "Золото III",
-    "Gold II": "Золото II",
-    "Gold I": "Золото I",
-
-    "Iridescent IV": "Радужный IV",
-    "Iridescent III": "Радужный III",
-    "Iridescent II": "Радужный II",
-    "Iridescent I": "Радужный I"
-  };
-
-  return grades[grade] || grade;
 }

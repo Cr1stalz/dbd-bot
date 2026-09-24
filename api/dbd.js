@@ -2,41 +2,83 @@ export default async function handler(req, res) {
   try {
     const apiKey = process.env.STEAM_API_KEY;
 
+    if (!apiKey) {
+      return res.status(500).send("❌ STEAM_API_KEY не настроен.");
+    }
+
     let steamId = req.query.steamid || process.env.STEAM_ID;
 
-    // Если передана ссылка на Steam-профиль —
-    // автоматически извлекаем SteamID
-    if (steamId) {
-      const value = String(steamId);
+    if (!steamId) {
+      return res.status(400).send("❌ Steam-профиль не указан.");
+    }
 
-      const profileMatch = value.match(
+    steamId = String(steamId);
+
+    // Если передан прямой SteamID
+    if (/^\d{17}$/.test(steamId)) {
+      // Уже правильный SteamID
+    } else {
+      // Если передана ссылка на профиль
+      let profileUrl = steamId;
+
+      try {
+        profileUrl = decodeURIComponent(profileUrl);
+      } catch {}
+
+      // Профиль вида /profiles/7656119...
+      const profileMatch = profileUrl.match(
         /steamcommunity\.com\/profiles\/(\d{17})/
       );
 
       if (profileMatch) {
         steamId = profileMatch[1];
-      } else if (/^\d{17}$/.test(value)) {
-        steamId = value;
       } else {
-        return res
-          .status(400)
-          .send("❌ Неверная ссылка на Steam-профиль.");
+        // Профиль вида /id/username
+        const vanityMatch = profileUrl.match(
+          /steamcommunity\.com\/id\/([^/?#]+)/i
+        );
+
+        if (!vanityMatch) {
+          return res
+            .status(400)
+            .send("❌ Неверная ссылка на Steam-профиль.");
+        }
+
+        const vanityUrl =
+          `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?` +
+          `key=${encodeURIComponent(apiKey)}` +
+          `&vanityurl=${encodeURIComponent(vanityMatch[1])}` +
+          `&format=json`;
+
+        const vanityResponse = await fetch(vanityUrl);
+
+        if (!vanityResponse.ok) {
+          return res
+            .status(502)
+            .send("❌ Steam не смог определить профиль.");
+        }
+
+        const vanityData = await vanityResponse.json();
+
+        if (
+          vanityData?.response?.success !== 1 ||
+          !vanityData?.response?.steamid
+        ) {
+          return res
+            .status(404)
+            .send("❌ Steam-профиль не найден.");
+        }
+
+        steamId = vanityData.response.steamid;
       }
-    }
-
-    if (!apiKey) {
-      return res.status(500).send("❌ STEAM_API_KEY не настроен.");
-    }
-
-    if (!steamId) {
-      return res.status(400).send("❌ SteamID не настроен.");
     }
 
     // Профиль Steam
     const profileUrl =
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?` +
       `key=${encodeURIComponent(apiKey)}` +
-      `&steamids=${encodeURIComponent(steamId)}`;
+      `&steamids=${encodeURIComponent(steamId)}` +
+      `&format=json`;
 
     // Игры и время
     const gamesUrl =
@@ -87,14 +129,17 @@ export default async function handler(req, res) {
         );
 
         if (dbdGame && dbdGame.playtime_forever != null) {
-          const hours = Number(dbdGame.playtime_forever) / 60;
+          const hours =
+            Number(dbdGame.playtime_forever) / 60;
+
           playtime = `${hours.toFixed(1)} ч`;
         }
       }
     }
 
     // Получаем статы
-    const stats = statsData?.playerstats?.stats || [];
+    const stats =
+      statsData?.playerstats?.stats || [];
 
     function getStat(name) {
       const stat = stats.find(
@@ -107,17 +152,19 @@ export default async function handler(req, res) {
 
       const value = Number(stat.value);
 
-      return Number.isFinite(value) ? value : 0;
+      return Number.isFinite(value)
+        ? value
+        : 0;
     }
 
-    // Пипы киллера и выжившего
+    // Пипы
     const killerPips =
       getStat("DBD_KillerSkulls");
 
     const survivorPips =
       getStat("DBD_CamperSkulls");
 
-    // Убийства и жертвы
+    // Убийства + жертвы
     const killed =
       getStat("DBD_KilledCampers");
 
@@ -170,7 +217,7 @@ export default async function handler(req, res) {
     const survivorRank =
       getRank(survivorPips);
 
-    // Итоговое сообщение
+    // Итог
     const message =
       `👤 ${nickname}` +
       ` | ⏱ ${playtime}` +
@@ -202,3 +249,4 @@ export default async function handler(req, res) {
       .send("❌ Ошибка при получении данных.");
   }
 }
+```

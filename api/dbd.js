@@ -1,113 +1,113 @@
 export default async function handler(req, res) {
   try {
-    const { steamid, profile } = req.query;
+    const apiKey = process.env.STEAM_API_KEY;
+    const steamId = req.query.steamid || process.env.STEAM_ID;
 
-    let steamId = steamid;
-
-    // Если передана ссылка на Steam-профиль
-    if (!steamId && profile) {
-      const match = profile.match(/steamcommunity\.com\/profiles\/(\d+)/i);
-
-      if (match) {
-        steamId = match[1];
-      } else {
-        return res.status(400).send("⚠️ Не удалось определить SteamID.");
-      }
+    if (!apiKey) {
+      return res.status(500).send("❌ STEAM_API_KEY не настроен.");
     }
 
     if (!steamId) {
-      return res.status(400).send("⚠️ Укажите SteamID или ссылку на профиль!");
+      return res.status(400).send("❌ SteamID не настроен.");
     }
 
-    const apiKey = process.env.STEAM_API_KEY;
+    // Steam API: профиль
+    const profileUrl =
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/` +
+      `?key=${encodeURIComponent(apiKey)}` +
+      `&steamids=${encodeURIComponent(steamId)}`;
 
-    if (!apiKey) {
-      return res.status(500).send("❌ Steam API key не настроен на Vercel.");
+    // Steam API: список игр и время
+    const gamesUrl =
+      `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/` +
+      `?key=${encodeURIComponent(apiKey)}` +
+      `&steamid=${encodeURIComponent(steamId)}` +
+      `&format=json&include_appinfo=true`;
+
+    const [profileResponse, gamesResponse] = await Promise.all([
+      fetch(profileUrl),
+      fetch(gamesUrl)
+    ]);
+
+    if (!profileResponse.ok || !gamesResponse.ok) {
+      return res.status(502).send("❌ Ошибка Steam API.");
     }
 
-    const steamUrl =
-      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/` +
-      `?appid=381210` +
-      `&key=${encodeURIComponent(apiKey)}` +
-      `&steamid=${encodeURIComponent(steamId)}`;
+    const profileData = await profileResponse.json();
+    const gamesData = await gamesResponse.json();
 
-    const response = await fetch(steamUrl);
+    // =========================
+    // НИК
+    // =========================
 
-    if (!response.ok) {
-      return res.status(502).send("❌ Steam API вернул ошибку.");
+    const player = profileData?.response?.players?.[0];
+
+    const nickname =
+      player?.personaname || "Steam";
+
+    // =========================
+    // ВРЕМЯ ИГРЫ
+    // =========================
+
+    const games = gamesData?.response?.games;
+
+    let playtime = "Время игры скрыто";
+
+    if (Array.isArray(games)) {
+      const dbdGame = games.find(
+        (game) => Number(game.appid) === 381210
+      );
+
+      if (dbdGame && dbdGame.playtime_forever != null) {
+        const hours =
+          Number(dbdGame.playtime_forever) / 60;
+
+        playtime = `${hours.toFixed(1)} ч`;
+      }
     }
 
-    const data = await response.json();
+    // =========================
+    // РАНГИ
+    // =========================
+    //
+    // Steam Web API не отдаёт текущий
+    // ранг убийцы/выжившего DBD.
+    //
+    // Пока оставляем "—".
+    // Когда подключим источник рангов,
+    // эти значения будут автоматически заменены.
+    //
 
-    if (!data.playerstats || !data.playerstats.stats) {
-      return res.status(404).send("❌ Статистика Dead by Daylight не найдена.");
-    }
+    const killerRank = "—";
+    const survivorRank = "—";
 
-    const stats = data.playerstats.stats;
-
-    function getStat(name) {
-      const stat = stats.find((item) => item.name === name);
-      return stat ? Number(stat.value) : 0;
-    }
-
-    // Основные статистики DBD
-    const sacrificed = getStat("DBD_SacrificedCampers");
-    const killed = getStat("DBD_KilledCampers");
-
-    const escapes = getStat("DBD_Escape");
-    const hatchEscapes = getStat("DBD_EscapeThroughHatch");
-
-    const bloodwebPrestige = getStat("DBD_BloodwebMaxPrestigeLevel");
-
-    const generators = getStat("DBD_FixSecondFloorGenerator_MapAsy_Asylum");
-
-    const skillChecks = getStat("DBD_SkillCheckSuccess");
-
-    const heals = getStat("DBD_UnhookOrHeal");
-
-    const killerLoadouts = getStat("DBD_SlasherFullLoadout");
-    const survivorLoadouts = getStat("DBD_CamperFullLoadout");
-
-    const rankUnlock = getStat("DBD_UnlockRanking");
-
-    const format = (number) =>
-      Number(number).toLocaleString("ru-RU");
-
-    /*
-     * Steam API не предоставляет здесь:
-     * - общее игровое время DBD
-     * - текущий Grade (Bronze II, Silver I и т.д.)
-     *
-     * Поэтому эти значения пока не показываем.
-     */
+    // =========================
+    // ОТВЕТ
+    // =========================
 
     const message =
-      `🎮 DBD | ` +
-      `🔪 Жертв: ${format(sacrificed)} | ` +
-      `💀 Убийств: ${format(killed)} | ` +
-      `🏃 Побегов: ${format(escapes)} | ` +
-      `🚪 Люк: ${format(hatchEscapes)} | ` +
-      `🩸 Престиж: ${format(bloodwebPrestige)} | ` +
-      `🎯 Skill Check: ${format(skillChecks)} | ` +
-      `💉 Лечение/снятие: ${format(heals)}`;
-
-    res.setHeader(
-      "Cache-Control",
-      "s-maxage=60, stale-while-revalidate=300"
-    );
+      `👤 ${nickname}` +
+      ` | ⏱ ${playtime}` +
+      ` | 🔪 ${killerRank}` +
+      ` | 🧑 ${survivorRank}`;
 
     res.setHeader(
       "Content-Type",
       "text/plain; charset=utf-8"
     );
 
+    res.setHeader(
+      "Cache-Control",
+      "s-maxage=60, stale-while-revalidate=300"
+    );
+
     return res.status(200).send(message);
 
   } catch (error) {
-    console.error("DBD API ERROR:", error);
+    console.error(error);
 
-    return res
-      .status(500)
-      .send("❌ Внутренняя ошибка API.");
+    return res.status(500).send(
+      "❌ Ошибка при получении данных."
+    );
   }
 }

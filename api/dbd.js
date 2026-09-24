@@ -2,16 +2,21 @@ export default async function handler(req, res) {
   try {
     const apiKey = process.env.STEAM_API_KEY;
 
+    // =========================
+    // ПРОВЕРКА API KEY
+    // =========================
+
     if (!apiKey) {
-      return res.status(500).send(
+      return res.status(200).send(
         "❌ STEAM_API_KEY не настроен."
       );
     }
 
-    let steamId = req.query.steamid || process.env.STEAM_ID;
+    let steamId =
+      req.query.steamid || process.env.STEAM_ID;
 
     if (!steamId) {
-      return res.status(400).send(
+      return res.status(200).send(
         "❌ Steam-профиль не указан."
       );
     }
@@ -27,19 +32,26 @@ export default async function handler(req, res) {
     // =========================
 
     if (!/^\d{17}$/.test(steamId)) {
-      const profileMatch = steamId.match(
-        /steamcommunity\.com\/profiles\/(\d{17})/i
-      );
+
+      // /profiles/7656119...
+      const profileMatch =
+        steamId.match(
+          /steamcommunity\.com\/profiles\/(\d{17})/i
+        );
 
       if (profileMatch) {
         steamId = profileMatch[1];
+
       } else {
-        const vanityMatch = steamId.match(
-          /steamcommunity\.com\/id\/([^/?#]+)/i
-        );
+
+        // /id/username
+        const vanityMatch =
+          steamId.match(
+            /steamcommunity\.com\/id\/([^/?#]+)/i
+          );
 
         if (!vanityMatch) {
-          return res.status(400).send(
+          return res.status(200).send(
             "❌ Неверная ссылка на Steam-профиль."
           );
         }
@@ -55,7 +67,7 @@ export default async function handler(req, res) {
             await fetch(vanityUrl);
 
           if (!vanityResponse.ok) {
-            return res.status(404).send(
+            return res.status(200).send(
               "❌ Профиль скрыт"
             );
           }
@@ -67,7 +79,7 @@ export default async function handler(req, res) {
             vanityData?.response?.success !== 1 ||
             !vanityData?.response?.steamid
           ) {
-            return res.status(404).send(
+            return res.status(200).send(
               "❌ Профиль скрыт"
             );
           }
@@ -76,7 +88,7 @@ export default async function handler(req, res) {
             vanityData.response.steamid;
 
         } catch {
-          return res.status(404).send(
+          return res.status(200).send(
             "❌ Профиль скрыт"
           );
         }
@@ -86,7 +98,7 @@ export default async function handler(req, res) {
     const appId = 381210;
 
     // =========================
-    // STEAM API URL
+    // URL STEAM API
     // =========================
 
     const profileUrl =
@@ -109,7 +121,7 @@ export default async function handler(req, res) {
       `&format=json`;
 
     // =========================
-    // ПРОФИЛЬ
+    // ПРОФИЛЬ STEAM
     // =========================
 
     let profileResponse;
@@ -118,13 +130,13 @@ export default async function handler(req, res) {
       profileResponse =
         await fetch(profileUrl);
     } catch {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
 
     if (!profileResponse.ok) {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
@@ -135,7 +147,7 @@ export default async function handler(req, res) {
       profileData =
         await profileResponse.json();
     } catch {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
@@ -144,7 +156,7 @@ export default async function handler(req, res) {
       profileData?.response?.players?.[0];
 
     if (!player) {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
@@ -164,6 +176,7 @@ export default async function handler(req, res) {
         await fetch(gamesUrl);
 
       if (gamesResponse.ok) {
+
         const gamesData =
           await gamesResponse.json();
 
@@ -171,6 +184,7 @@ export default async function handler(req, res) {
           gamesData?.response?.games;
 
         if (Array.isArray(games)) {
+
           const dbdGame =
             games.find(
               game =>
@@ -181,6 +195,7 @@ export default async function handler(req, res) {
             dbdGame &&
             dbdGame.playtime_forever != null
           ) {
+
             const hours =
               Number(
                 dbdGame.playtime_forever
@@ -208,16 +223,15 @@ export default async function handler(req, res) {
       statsResponse =
         await fetch(statsUrl);
     } catch {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
 
-    // Любая ошибка Steam API
-    // при получении статистики DBD
-    // означает, что статистика недоступна.
+    // Любой HTTP-код ошибки:
+    // 400 / 403 / 404 / 500 и т.д.
     if (!statsResponse.ok) {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
@@ -228,13 +242,12 @@ export default async function handler(req, res) {
       statsData =
         await statsResponse.json();
     } catch {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
 
     // Steam может вернуть {}
-    // вместо playerstats
     if (
       !statsData ||
       !statsData.playerstats ||
@@ -242,7 +255,7 @@ export default async function handler(req, res) {
         statsData.playerstats.stats
       )
     ) {
-      return res.status(404).send(
+      return res.status(200).send(
         "❌ Профиль скрыт"
       );
     }
@@ -255,6 +268,7 @@ export default async function handler(req, res) {
     // =========================
 
     function getStat(name) {
+
       const stat =
         stats.find(
           item => item.name === name
@@ -307,6 +321,7 @@ export default async function handler(req, res) {
     // =========================
 
     function getRank(pips) {
+
       if (pips <= 2) return "Пепел IV";
       if (pips <= 5) return "Пепел III";
       if (pips <= 9) return "Пепел II";
@@ -358,6 +373,8 @@ export default async function handler(req, res) {
       "text/plain; charset=utf-8"
     );
 
+    // ВАЖНО:
+    // Moobot получает HTTP 200
     res.setHeader(
       "Cache-Control",
       "no-store"
@@ -368,9 +385,12 @@ export default async function handler(req, res) {
       .send(message);
 
   } catch (error) {
+
     console.error(error);
 
-    return res.status(404).send(
+    // Даже при неожиданной ошибке
+    // отдаём HTTP 200 для Moobot
+    return res.status(200).send(
       "❌ Профиль скрыт"
     );
   }

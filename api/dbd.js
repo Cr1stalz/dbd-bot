@@ -16,15 +16,26 @@ export default async function handler(req, res) {
       );
     }
 
-    steamId = String(steamId);
+    // =========================
+    // ИСХОДНЫЙ STEAMID
+    // =========================
+
+    const originalSteamInput = String(steamId);
 
     try {
-      steamId = decodeURIComponent(steamId);
+      steamId = decodeURIComponent(
+        String(steamId)
+      );
     } catch {}
 
-    // SteamID64 напрямую
+    steamId = String(steamId).trim();
+
+    // =========================
+    // ОПРЕДЕЛЯЕМ STEAMID64
+    // =========================
+
     if (/^\d{17}$/.test(steamId)) {
-      // Всё нормально
+      // SteamID уже передан напрямую
     } else {
       // /profiles/7656119...
       const profileMatch = steamId.match(
@@ -41,7 +52,10 @@ export default async function handler(req, res) {
 
         if (!vanityMatch) {
           return res.status(400).send(
-            "❌ Не удалось найти SteamID в переданной ссылке."
+            `❌ Не удалось определить SteamID.
+
+Получено:
+${originalSteamInput}`
           );
         }
 
@@ -54,28 +68,61 @@ export default async function handler(req, res) {
         let vanityResponse;
 
         try {
-          vanityResponse = await fetch(vanityUrl);
+          vanityResponse =
+            await fetch(vanityUrl);
         } catch (error) {
           return res.status(502).send(
-            `❌ ResolveVanityURL: ошибка соединения: ${error.message}`
+            `❌ ResolveVanityURL: ошибка соединения.
+
+Получено:
+${originalSteamInput}
+
+Vanity:
+${vanityMatch[1]}
+
+Ошибка:
+${error.message}`
           );
         }
 
         if (!vanityResponse.ok) {
+          const body =
+            await vanityResponse.text();
+
           return res.status(502).send(
-            `❌ ResolveVanityURL: HTTP ${vanityResponse.status}`
+            `❌ ResolveVanityURL: HTTP ${vanityResponse.status}
+
+Vanity:
+${vanityMatch[1]}
+
+Ответ Steam:
+${body || "{}"}`
           );
         }
 
-        const vanityData =
-          await vanityResponse.json();
+        let vanityData;
+
+        try {
+          vanityData =
+            await vanityResponse.json();
+        } catch {
+          return res.status(502).send(
+            "❌ ResolveVanityURL: Steam вернул некорректный JSON."
+          );
+        }
 
         if (
           vanityData?.response?.success !== 1 ||
           !vanityData?.response?.steamid
         ) {
           return res.status(404).send(
-            "❌ Steam-профиль по указанной ссылке не найден."
+            `❌ Steam-профиль не найден.
+
+Vanity:
+${vanityMatch[1]}
+
+Ответ Steam:
+${JSON.stringify(vanityData)}`
           );
         }
 
@@ -85,7 +132,13 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // STEAM API URL
+    // APPID DBD
+    // =========================
+
+    const appId = 381210;
+
+    // =========================
+    // URL ЗАПРОСОВ
     // =========================
 
     const profileUrl =
@@ -102,9 +155,16 @@ export default async function handler(req, res) {
 
     const statsUrl =
       `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
-      `appid=381210` +
+      `appid=${appId}` +
       `&key=${encodeURIComponent(apiKey)}` +
       `&steamid=${encodeURIComponent(steamId)}` +
+      `&format=json`;
+
+    // URL для диагностики — БЕЗ API KEY
+    const safeStatsUrl =
+      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
+      `appid=${appId}` +
+      `&steamid=${steamId}` +
       `&format=json`;
 
     // =========================
@@ -118,7 +178,16 @@ export default async function handler(req, res) {
         await fetch(profileUrl);
     } catch (error) {
       return res.status(502).send(
-        `❌ GetPlayerSummaries: ошибка соединения: ${error.message}`
+        `❌ GetPlayerSummaries: ошибка соединения.
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+Ошибка:
+${error.message}`
       );
     }
 
@@ -127,7 +196,16 @@ export default async function handler(req, res) {
         await profileResponse.text();
 
       return res.status(502).send(
-        `❌ GetPlayerSummaries: HTTP ${profileResponse.status}. ${body}`
+        `❌ GetPlayerSummaries: HTTP ${profileResponse.status}
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+Ответ Steam:
+${body || "{}"}`
       );
     }
 
@@ -138,7 +216,10 @@ export default async function handler(req, res) {
         await profileResponse.json();
     } catch {
       return res.status(502).send(
-        "❌ GetPlayerSummaries: Steam вернул некорректный JSON."
+        `❌ GetPlayerSummaries: некорректный JSON.
+
+SteamID:
+${steamId}`
       );
     }
 
@@ -147,7 +228,13 @@ export default async function handler(req, res) {
 
     if (!player) {
       return res.status(404).send(
-        "❌ GetPlayerSummaries: профиль не найден или закрыт."
+        `❌ GetPlayerSummaries: профиль не найден.
+
+SteamID:
+${steamId}
+
+Ответ Steam:
+${JSON.stringify(profileData)}`
       );
     }
 
@@ -155,7 +242,7 @@ export default async function handler(req, res) {
       player.personaname || "Steam";
 
     // =========================
-    // ИГРЫ / ВРЕМЯ
+    // ВРЕМЯ ИГРЫ
     // =========================
 
     let playtime =
@@ -168,46 +255,51 @@ export default async function handler(req, res) {
         await fetch(gamesUrl);
     } catch (error) {
       return res.status(502).send(
-        `❌ GetOwnedGames: ошибка соединения: ${error.message}`
+        `❌ GetOwnedGames: ошибка соединения.
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+Ошибка:
+${error.message}`
       );
     }
 
-    if (!gamesResponse.ok) {
-      return res.status(502).send(
-        `❌ GetOwnedGames: HTTP ${gamesResponse.status}`
-      );
-    }
+    if (gamesResponse.ok) {
+      try {
+        const gamesData =
+          await gamesResponse.json();
 
-    try {
-      const gamesData =
-        await gamesResponse.json();
+        const games =
+          gamesData?.response?.games;
 
-      const games =
-        gamesData?.response?.games;
+        if (Array.isArray(games)) {
+          const dbdGame =
+            games.find(
+              game =>
+                Number(game.appid) === appId
+            );
 
-      if (Array.isArray(games)) {
-        const dbdGame =
-          games.find(
-            game => Number(game.appid) === 381210
-          );
+          if (
+            dbdGame &&
+            dbdGame.playtime_forever != null
+          ) {
+            const hours =
+              Number(
+                dbdGame.playtime_forever
+              ) / 60;
 
-        if (
-          dbdGame &&
-          dbdGame.playtime_forever != null
-        ) {
-          const hours =
-            Number(
-              dbdGame.playtime_forever
-            ) / 60;
-
-          playtime =
-            `${hours.toFixed(1)} ч`;
+            playtime =
+              `${hours.toFixed(1)} ч`;
+          }
         }
+      } catch {
+        playtime =
+          "Время игры скрыто";
       }
-    } catch {
-      return res.status(502).send(
-        "❌ GetOwnedGames: Steam вернул некорректный JSON."
-      );
     }
 
     // =========================
@@ -221,7 +313,19 @@ export default async function handler(req, res) {
         await fetch(statsUrl);
     } catch (error) {
       return res.status(502).send(
-        `❌ GetUserStatsForGame: ошибка соединения: ${error.message}`
+        `❌ GetUserStatsForGame: ошибка соединения.
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+URL без API-ключа:
+${safeStatsUrl}
+
+Ошибка:
+${error.message}`
       );
     }
 
@@ -230,7 +334,19 @@ export default async function handler(req, res) {
         await statsResponse.text();
 
       return res.status(502).send(
-        `❌ GetUserStatsForGame: HTTP ${statsResponse.status}. ${body}`
+        `❌ GetUserStatsForGame: HTTP ${statsResponse.status}
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+URL без API-ключа:
+${safeStatsUrl}
+
+Ответ Steam:
+${body || "{}"}`
       );
     }
 
@@ -241,15 +357,40 @@ export default async function handler(req, res) {
         await statsResponse.json();
     } catch {
       return res.status(502).send(
-        "❌ GetUserStatsForGame: Steam вернул некорректный JSON."
+        `❌ GetUserStatsForGame: некорректный JSON.
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+URL без API-ключа:
+${safeStatsUrl}`
       );
     }
 
     if (!statsData?.playerstats) {
       return res.status(404).send(
-        "❌ GetUserStatsForGame: Steam не вернул статистику DBD."
+        `❌ GetUserStatsForGame: Steam не вернул playerstats.
+
+SteamID:
+${steamId}
+
+AppID:
+${appId}
+
+URL без API-ключа:
+${safeStatsUrl}
+
+Ответ Steam:
+${JSON.stringify(statsData)}`
       );
     }
+
+    // =========================
+    // СТАТИСТИКА
+    // =========================
 
     const stats =
       statsData.playerstats.stats || [];
@@ -274,10 +415,6 @@ export default async function handler(req, res) {
         ? value
         : 0;
     }
-
-    // =========================
-    // СТАТИСТИКА
-    // =========================
 
     const killerPips =
       getStat("DBD_KillerSkulls");

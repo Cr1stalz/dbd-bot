@@ -308,6 +308,16 @@ export default async function handler(req, res) {
     const totalKills =
       killed + sacrificed;
 
+    // Побеги = обычные побеги + побеги через люк
+    const escapes =
+      getStat("DBD_Escape");
+
+    const hatchEscapes =
+      getStat("DBD_EscapeThroughHatch");
+
+    const totalEscapes =
+      escapes + hatchEscapes;
+
     const generators =
       getStat("DBD_GeneratorPct_float");
 
@@ -365,6 +375,7 @@ export default async function handler(req, res) {
       ` | 🔪 ${killerRank}` +
       ` | 🧑 ${survivorRank}` +
       ` | ☠️ Убийства: ${totalKills}` +
+      ` | 🏃 Побеги: ${totalEscapes}` +
       ` | ⚙️ Генераторов: ${Math.round(generators)}` +
       ` | 🩸 Макс. престиж: ${maxPrestige}`;
 
@@ -373,8 +384,7 @@ export default async function handler(req, res) {
       "text/plain; charset=utf-8"
     );
 
-    // ВАЖНО:
-    // Moobot получает HTTP 200
+    // Moobot всегда получает HTTP 200
     res.setHeader(
       "Cache-Control",
       "no-store"

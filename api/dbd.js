@@ -35,38 +35,9 @@ export default async function handler(req, res) {
       pips = 0;
     }
 
-    /*
-      Grades требуют:
-
-      Ash IV       0–2
-      Ash III      3–5
-      Ash II       6–9
-      Ash I        10–13
-
-      Bronze IV    14–17
-      Bronze III   18–21
-      Bronze II    22–25
-      Bronze I     26–29
-
-      Silver IV    30–34
-      Silver III   35–39
-      Silver II    40–44
-      Silver I     45–49
-
-      Gold IV      50–54
-      Gold III     55–59
-      Gold II      60–64
-      Gold I       65–69
-
-      Iridescent IV 70–74
-      Iridescent III 75–79
-      Iridescent II 80–84
-      Iridescent I  85+
-    */
-
-    if (pips <= 2)  return "Пепел IV";
-    if (pips <= 5)  return "Пепел III";
-    if (pips <= 9)  return "Пепел II";
+    if (pips <= 2) return "Пепел IV";
+    if (pips <= 5) return "Пепел III";
+    if (pips <= 9) return "Пепел II";
     if (pips <= 13) return "Пепел I";
 
     if (pips <= 17) return "Бронза IV";
@@ -99,12 +70,12 @@ export default async function handler(req, res) {
 
     input = decodeURIComponent(input.trim());
 
-    // Просто SteamID64
+    // SteamID64
     if (/^\d{17}$/.test(input)) {
       return input;
     }
 
-    // https://steamcommunity.com/profiles/765611...
+    // /profiles/SteamID64
     const profileMatch = input.match(
       /steamcommunity\.com\/profiles\/(\d{17})/i
     );
@@ -126,7 +97,7 @@ export default async function handler(req, res) {
     }
 
     // ==============================
-    // Получаем параметр steamid
+    // Получаем steamid из URL
     // ==============================
     let input = req.query?.steamid;
 
@@ -283,7 +254,7 @@ export default async function handler(req, res) {
     }
 
     // ==============================
-    // Превращаем Steam stats в объект
+    // Превращаем статистику в объект
     // ==============================
     const stats = {};
 
@@ -355,7 +326,7 @@ export default async function handler(req, res) {
         : `⏱ Время игры скрыто`;
 
     // ==============================
-    // Итоговый текст
+    // Итоговый порядок информации
     // ==============================
     const result =
       `👤 ${nickname}` +
@@ -363,18 +334,20 @@ export default async function handler(req, res) {
       ` | 🔪 Ранг убийцы: ${killerGrade}` +
       ` | 🧑 Ранг выжившего: ${survivorGrade}` +
       ` | ☠️ Убийства: ${totalKills}` +
-      ` | ⚙️ Генераторов: ${generators}` +
+      ` | 🏃 Побеги: ${escapes}` +
       ` | ⭐ Макс. престиж: ${maxPrestige}` +
-      ` | 🩸 Очки крови: ${formatNumber(bloodpoints)}` +
-      ` | 🏃 Побеги: ${escapes}`;
+      ` | ⚙️ Генераторов: ${generators}` +
+      ` | 🩸 Очки крови: ${formatNumber(bloodpoints)}`;
 
-    // Moobot получает HTTP 200
+    // ==============================
+    // Ответ для Moobot
+    // ==============================
     res.status(200).send(result);
 
   } catch (error) {
     console.error(error);
 
-    // Не выдаём 404/500 для Moobot
+    // Всегда HTTP 200, чтобы Moobot не выдавал Data tag failure
     res.status(200).send("❌ Профиль скрыт");
   }
 }

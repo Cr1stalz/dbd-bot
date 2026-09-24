@@ -18,13 +18,17 @@ html {
 }
 
 body {
-    min-height: 100vh;
     background:
-        radial-gradient(circle at 50% -10%, rgba(190, 0, 0, .22), transparent 38%),
+        radial-gradient(circle at 50% -15%, rgba(190,0,0,.25), transparent 40%),
         #080808;
+
     color: #eee;
+
     font-family: Arial, Helvetica, sans-serif;
+
+    min-height: 100vh;
 }
+
 
 /* =========================
    HEADER
@@ -32,27 +36,38 @@ body {
 
 header {
     height: 64px;
-    border-bottom: 1px solid #242424;
-    background: rgba(8,8,8,.9);
-    backdrop-filter: blur(12px);
+
     position: sticky;
     top: 0;
-    z-index: 10;
+
+    z-index: 100;
+
+    background: rgba(8,8,8,.92);
+
+    backdrop-filter: blur(12px);
+
+    border-bottom: 1px solid #222;
 }
 
 .header {
     max-width: 900px;
+
     height: 100%;
+
     margin: auto;
+
     padding: 0 20px;
 
     display: flex;
-    justify-content: space-between;
+
     align-items: center;
+
+    justify-content: space-between;
 }
 
 .logo {
     font-size: 20px;
+
     font-weight: 900;
 }
 
@@ -61,32 +76,37 @@ header {
 }
 
 .discord {
-    color: #888;
+    color: #777;
+
     font-size: 12px;
 
     display: flex;
+
     align-items: center;
+
     gap: 6px;
 }
 
 .discord-icon {
     color: #7289da;
-    font-size: 13px;
 }
 
 .discord strong {
     color: #ccc;
-    font-weight: 700;
 }
+
 
 /* =========================
    HERO
 ========================= */
 
 .hero {
-    max-width: 760px;
+    max-width: 800px;
+
     margin: auto;
+
     padding: 75px 20px 45px;
+
     text-align: center;
 }
 
@@ -95,22 +115,27 @@ header {
 
     padding: 7px 13px;
 
+    margin-bottom: 20px;
+
     border: 1px solid #292929;
-    background: #111;
 
     border-radius: 30px;
 
-    color: #999;
-    font-size: 12px;
+    background: #111;
 
-    margin-bottom: 20px;
+    color: #999;
+
+    font-size: 12px;
 }
 
 h1 {
-    font-size: clamp(42px, 8vw, 68px);
+    font-size: clamp(42px, 8vw, 66px);
+
+    line-height: 1;
+
     letter-spacing: -3px;
 
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 }
 
 h1 span {
@@ -118,50 +143,111 @@ h1 span {
 }
 
 .hero p {
+    max-width: 600px;
+
+    margin: auto;
+
     color: #858585;
+
+    font-size: 15px;
+
     line-height: 1.7;
-    font-size: 16px;
 }
 
+
 /* =========================
-   CONTAINER
+   MAIN
 ========================= */
 
 .container {
     max-width: 760px;
+
     margin: auto;
+
     padding: 0 20px 80px;
 }
 
+
 /* =========================
-   MAIN PANEL
+   CARD
 ========================= */
 
-.panel {
-    background: linear-gradient(145deg, #161616, #0d0d0d);
+.card {
+    background:
+        linear-gradient(
+            145deg,
+            #161616,
+            #0d0d0d
+        );
 
     border: 1px solid #292929;
+
     border-radius: 18px;
 
-    padding: 30px;
+    padding: 28px;
+
+    margin-bottom: 18px;
 
     box-shadow:
-        0 25px 70px rgba(0,0,0,.35);
+        0 20px 60px rgba(0,0,0,.25);
 }
 
-.section-title {
-    margin-bottom: 20px;
+.card:last-child {
+    margin-bottom: 0;
 }
 
-.section-title h2 {
-    font-size: 23px;
-    margin-bottom: 7px;
+
+/* =========================
+   STEP TITLE
+========================= */
+
+.step-title {
+    display: flex;
+
+    gap: 13px;
+
+    align-items: flex-start;
+
+    margin-bottom: 22px;
 }
 
-.section-title p {
-    color: #777;
+.step-number {
+    flex: 0 0 32px;
+
+    width: 32px;
+    height: 32px;
+
+    border-radius: 9px;
+
+    background: #e50914;
+
+    color: white;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
     font-size: 13px;
+
+    font-weight: 900;
 }
+
+.step-title h2 {
+    font-size: 20px;
+
+    margin-bottom: 5px;
+}
+
+.step-title p {
+    color: #777;
+
+    font-size: 12px;
+
+    line-height: 1.5;
+}
+
 
 /* =========================
    BOT SELECT
@@ -169,19 +255,22 @@ h1 span {
 
 .bot-grid {
     display: grid;
+
     grid-template-columns: 1fr 1fr;
+
     gap: 12px;
 }
 
 .bot {
     position: relative;
 
-    padding: 20px;
-
-    border-radius: 13px;
-    border: 1px solid #292929;
+    padding: 22px;
 
     background: #101010;
+
+    border: 1px solid #292929;
+
+    border-radius: 13px;
 
     cursor: pointer;
 
@@ -190,30 +279,38 @@ h1 span {
 
 .bot:hover {
     border-color: #444;
+
     transform: translateY(-2px);
 }
 
 .bot.selected {
     border-color: #e50914;
 
+    background:
+        linear-gradient(
+            145deg,
+            #171010,
+            #101010
+        );
+
     box-shadow:
         0 0 0 1px rgba(229,9,20,.12);
 }
 
 .bot-check {
-    display: none;
-
     position: absolute;
 
-    top: 13px;
     right: 13px;
+    top: 13px;
 
-    width: 19px;
-    height: 19px;
+    width: 20px;
+    height: 20px;
 
     border-radius: 50%;
 
     background: #e50914;
+
+    display: none;
 
     align-items: center;
     justify-content: center;
@@ -227,211 +324,102 @@ h1 span {
 
 .bot-icon {
     font-size: 30px;
-    margin-bottom: 9px;
+
+    margin-bottom: 12px;
 }
 
 .bot-name {
+    font-size: 15px;
+
     font-weight: 900;
+
     margin-bottom: 5px;
 }
 
 .bot-description {
     color: #777;
-    font-size: 12px;
-}
 
-/* =========================
-   COMMAND
-========================= */
-
-.command-area {
-    margin-top: 32px;
-}
-
-label {
-    display: block;
-
-    color: #bbb;
-
-    font-size: 13px;
-    font-weight: 700;
-
-    margin-bottom: 8px;
-}
-
-input {
-    width: 100%;
-
-    padding: 14px;
-
-    background: #080808;
-
-    border: 1px solid #303030;
-    border-radius: 9px;
-
-    color: white;
-
-    outline: none;
-
-    font-size: 14px;
-}
-
-input:focus {
-    border-color: #e50914;
-
-    box-shadow:
-        0 0 0 3px rgba(229,9,20,.08);
-}
-
-.input-help {
-    color: #666;
     font-size: 11px;
-    margin-top: 7px;
+
+    line-height: 1.5;
 }
+
 
 /* =========================
-   GENERATE
+   CONFIGURATION
 ========================= */
 
-.generate {
-    width: 100%;
-
-    border: none;
-
-    background: #e50914;
-    color: white;
-
-    padding: 15px;
-
-    border-radius: 9px;
-
-    margin-top: 20px;
-
-    font-weight: 900;
-
-    cursor: pointer;
-
-    transition: .2s;
-}
-
-.generate:hover {
-    background: #ff1722;
-}
-
-/* =========================
-   RESULT
-========================= */
-
-.result {
-    display: none;
-    margin-top: 35px;
-}
-
-.result.show {
-    display: block;
-}
-
-.success {
-    padding: 15px;
-
-    border: 1px solid rgba(53,212,119,.25);
-
-    background: rgba(53,212,119,.06);
-
-    border-radius: 9px;
-
-    color: #9dd9b0;
-
-    font-size: 13px;
-
-    margin-bottom: 25px;
-}
-
-.result-title {
-    margin-bottom: 18px;
-}
-
-.result-title h2 {
-    font-size: 20px;
-    margin-bottom: 5px;
-}
-
-.result-title p {
-    color: #777;
-    font-size: 12px;
-}
-
-/* =========================
-   FIELDS
-========================= */
-
-.field {
-    margin-bottom: 16px;
-}
-
-.field-header {
-    display: flex;
-
-    justify-content: space-between;
-    align-items: center;
-
-    margin-bottom: 7px;
-}
-
-.field-name {
-    color: #aaa;
-
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.field-info {
-    color: #555;
-    font-size: 10px;
-}
-
-.code {
-    position: relative;
-
-    background: #050505;
+.config-box {
+    background: #080808;
 
     border: 1px solid #292929;
 
-    border-radius: 9px;
+    border-radius: 12px;
+
+    overflow: hidden;
 }
 
-.code pre {
-    padding: 14px 100px 14px 14px;
+.config-header {
+    padding: 12px 14px;
 
-    min-height: 48px;
+    background: #111;
 
-    color: #eee;
+    border-bottom: 1px solid #292929;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+}
+
+.config-name {
+    color: #aaa;
+
+    font-size: 11px;
+
+    font-weight: 800;
+}
+
+.config-place {
+    color: #555;
+
+    font-size: 10px;
+}
+
+.config-content {
+    position: relative;
+
+    padding: 17px;
+
+    padding-right: 100px;
+
+    color: #ddd;
 
     font-family: Consolas, monospace;
 
     font-size: 12px;
 
-    line-height: 1.5;
+    line-height: 1.6;
 
-    white-space: pre-wrap;
     word-break: break-all;
 }
 
 .copy {
     position: absolute;
 
-    right: 8px;
-    top: 8px;
+    right: 10px;
+    top: 10px;
 
-    border: 1px solid #292929;
+    padding: 7px 10px;
 
     background: #181818;
 
-    color: #aaa;
-
-    padding: 7px 9px;
+    border: 1px solid #303030;
 
     border-radius: 6px;
+
+    color: #aaa;
 
     font-size: 10px;
 
@@ -439,35 +427,39 @@ input:focus {
 }
 
 .copy:hover {
-    background: #252525;
     color: white;
+
+    background: #252525;
 }
 
+
 /* =========================
-   VISUAL MOOBOT
+   MOOBOT URL
 ========================= */
 
-.visual {
-    margin-top: 25px;
+.url-builder {
+    margin-top: 18px;
 
-    padding: 20px;
+    padding: 18px;
 
     background: #0a0a0a;
 
-    border: 1px solid #242424;
+    border: 1px solid #252525;
 
-    border-radius: 12px;
+    border-radius: 11px;
 }
 
-.visual-title {
-    font-size: 14px;
+.url-builder-title {
+    color: #aaa;
+
+    font-size: 12px;
 
     font-weight: 800;
 
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
-.moobot-box {
+.url-parts {
     display: flex;
 
     align-items: center;
@@ -477,8 +469,8 @@ input:focus {
     flex-wrap: wrap;
 }
 
-.moobot-part {
-    padding: 11px 13px;
+.url-part {
+    padding: 10px 12px;
 
     background: #151515;
 
@@ -486,153 +478,39 @@ input:focus {
 
     border-radius: 7px;
 
+    color: #ddd;
+
     font-family: Consolas, monospace;
 
-    font-size: 11px;
+    font-size: 10px;
+
+    word-break: break-all;
 }
 
-.moobot-part.url {
-    color: #ddd;
-}
-
-.moobot-part.argument {
-    color: #ff6b72;
-
-    border-color: #72252a;
+.url-part.argument {
+    color: #ff7378;
 
     background: rgba(229,9,20,.08);
+
+    border-color: #68282b;
 }
 
 .plus {
     color: #555;
-    font-weight: bold;
-}
-
-/* =========================
-   STEPS
-========================= */
-
-.steps {
-    margin-top: 25px;
-
-    padding: 20px;
-
-    background: #0d0d0d;
-
-    border: 1px solid #242424;
-
-    border-radius: 12px;
-}
-
-.steps h3 {
-    font-size: 15px;
-    margin-bottom: 17px;
-}
-
-.step {
-    display: flex;
-
-    gap: 12px;
-
-    margin-bottom: 15px;
-}
-
-.step:last-child {
-    margin-bottom: 0;
-}
-
-.step-number {
-    flex: 0 0 26px;
-
-    width: 26px;
-    height: 26px;
-
-    border-radius: 7px;
-
-    background: #171717;
-
-    border: 1px solid #2c2c2c;
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    color: #aaa;
-
-    font-size: 11px;
 
     font-weight: 900;
 }
 
-.step-text {
-    color: #888;
-
-    font-size: 12px;
-
-    line-height: 1.6;
-}
-
-.step-text strong {
-    color: #ddd;
-}
-
-/* =========================
-   EXAMPLE
-========================= */
-
-.example {
-    margin-top: 20px;
-
-    padding: 17px;
-
-    border-radius: 10px;
-
-    background: #101010;
-
-    border: 1px solid #252525;
-}
-
-.example-label {
-    color: #666;
-
-    font-size: 11px;
-
-    margin-bottom: 9px;
-}
-
-.example-command {
-    background: #050505;
-
-    border: 1px solid #292929;
+.warning {
+    margin-top: 13px;
 
     padding: 12px;
-
-    border-radius: 7px;
-
-    color: #ddd;
-
-    font-family: Consolas, monospace;
-
-    font-size: 12px;
-
-    overflow-x: auto;
-}
-
-/* =========================
-   NOTE
-========================= */
-
-.note {
-    margin-top: 18px;
-
-    padding: 15px;
 
     background: #15110b;
 
     border: 1px solid #40341f;
 
-    border-radius: 9px;
+    border-radius: 8px;
 
     color: #bcae8f;
 
@@ -640,6 +518,239 @@ input:focus {
 
     line-height: 1.6;
 }
+
+
+/* =========================
+   INSTRUCTIONS
+========================= */
+
+.instructions {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 13px;
+}
+
+.instruction {
+    display: flex;
+
+    gap: 12px;
+}
+
+.instruction-number {
+    flex: 0 0 27px;
+
+    width: 27px;
+    height: 27px;
+
+    border-radius: 7px;
+
+    background: #171717;
+
+    border: 1px solid #303030;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    color: #aaa;
+
+    font-size: 10px;
+
+    font-weight: 900;
+}
+
+.instruction-text {
+    padding-top: 3px;
+
+    color: #888;
+
+    font-size: 12px;
+
+    line-height: 1.6;
+}
+
+.instruction-text strong {
+    color: #ddd;
+}
+
+
+/* =========================
+   SUCCESS
+========================= */
+
+.success {
+    padding: 14px;
+
+    margin-top: 18px;
+
+    background: rgba(53,212,119,.06);
+
+    border: 1px solid rgba(53,212,119,.2);
+
+    border-radius: 9px;
+
+    color: #9dd9b0;
+
+    font-size: 11px;
+
+    line-height: 1.6;
+}
+
+
+/* =========================
+   TWITCH CHAT
+========================= */
+
+.twitch-chat {
+    background: #0e0e0e;
+
+    border: 1px solid #292929;
+
+    border-radius: 12px;
+
+    overflow: hidden;
+
+    box-shadow:
+        0 15px 40px rgba(0,0,0,.25);
+}
+
+.chat-header {
+    padding: 11px 14px;
+
+    background: #181818;
+
+    border-bottom: 1px solid #292929;
+
+    color: #aaa;
+
+    font-size: 11px;
+
+    font-weight: 800;
+}
+
+.chat-body {
+    padding: 17px 15px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 12px;
+}
+
+.chat-message {
+    font-size: 12px;
+
+    line-height: 1.7;
+
+    word-break: break-word;
+}
+
+.viewer-name {
+    color: #b58cff;
+
+    font-weight: 800;
+}
+
+.bot-name-chat {
+    color: #e56bff;
+
+    font-weight: 800;
+}
+
+.bot-badge {
+    display: inline-block;
+
+    margin-left: 4px;
+
+    padding: 1px 4px;
+
+    border-radius: 3px;
+
+    background: #9147ff;
+
+    color: white;
+
+    font-size: 8px;
+
+    font-weight: 900;
+
+    vertical-align: middle;
+}
+
+.chat-command {
+    color: #ddd;
+}
+
+.chat-response {
+    color: #ddd;
+
+    margin-left: 0;
+}
+
+.stats {
+    color: #eee;
+
+    line-height: 1.8;
+}
+
+.stats strong {
+    color: #fff;
+}
+
+.chat-input {
+    padding: 12px;
+
+    border-top: 1px solid #292929;
+
+    background: #121212;
+}
+
+.fake-input {
+    padding: 10px 12px;
+
+    background: #080808;
+
+    border: 1px solid #303030;
+
+    border-radius: 6px;
+
+    color: #555;
+
+    font-size: 11px;
+}
+
+
+/* =========================
+   USAGE
+========================= */
+
+.usage-info {
+    margin-top: 15px;
+
+    padding: 14px;
+
+    background: #0b0b0b;
+
+    border: 1px solid #252525;
+
+    border-radius: 9px;
+
+    color: #777;
+
+    font-size: 11px;
+
+    line-height: 1.7;
+}
+
+.usage-info strong {
+    color: #ddd;
+}
+
 
 /* =========================
    FOOTER
@@ -654,8 +765,9 @@ footer {
 
     color: #555;
 
-    font-size: 11px;
+    font-size: 10px;
 }
+
 
 /* =========================
    MOBILE
@@ -664,10 +776,14 @@ footer {
 @media (max-width: 600px) {
 
     .hero {
-        padding-top: 50px;
+        padding-top: 55px;
     }
 
-    .panel {
+    .hero h1 {
+        letter-spacing: -2px;
+    }
+
+    .card {
         padding: 20px;
     }
 
@@ -675,18 +791,21 @@ footer {
         grid-template-columns: 1fr;
     }
 
-    .code pre {
-        padding-right: 14px;
-        padding-bottom: 50px;
+    .config-content {
+        padding-right: 15px;
+
+        padding-bottom: 52px;
     }
 
     .copy {
         top: auto;
-        bottom: 8px;
+
+        bottom: 9px;
     }
 
-    .moobot-box {
+    .url-parts {
         flex-direction: column;
+
         align-items: stretch;
     }
 
@@ -697,11 +816,17 @@ footer {
     .discord {
         font-size: 10px;
     }
+
+    .stats {
+        font-size: 11px;
+    }
 }
 </style>
 </head>
 
+
 <body>
+
 
 <!-- =========================
      HEADER
@@ -733,7 +858,7 @@ footer {
 <section class="hero">
 
     <div class="badge">
-        ⚡ Готовая настройка Twitch
+        ⚡ Twitch • Steam • Dead by Daylight
     </div>
 
     <h1>
@@ -741,220 +866,159 @@ footer {
     </h1>
 
     <p>
-        Выбери своего Twitch-бота и получи готовую команду.
-        Зрители смогут проверять статистику любого Steam-профиля
-        прямо в чате.
+        Подключи готовую команду для Twitch
+        и показывай статистику Dead by Daylight
+        любого Steam-профиля прямо в чате.
     </p>
 
 </section>
 
 
-<!-- =========================
-     MAIN
-========================= -->
-
 <main class="container">
 
-<div class="panel">
 
-    <!-- BOT -->
+    <!-- =========================
+         STEP 1
+    ========================= -->
 
-    <div class="section-title">
+    <section class="card">
 
-        <h2>
-            🤖 Выбери бота
-        </h2>
+        <div class="step-title">
 
-        <p>
-            Настройка отличается в зависимости
-            от используемого бота.
-        </p>
-
-    </div>
-
-
-    <div class="bot-grid">
-
-        <div
-            class="bot selected"
-            id="moobot"
-            onclick="selectBot('moobot')"
-        >
-
-            <div class="bot-check">
-                ✓
+            <div class="step-number">
+                1
             </div>
 
-            <div class="bot-icon">
-                🤖
-            </div>
+            <div>
 
-            <div class="bot-name">
-                Moobot
-            </div>
+                <h2>
+                    Выбери Twitch-бота
+                </h2>
 
-            <div class="bot-description">
-                URL Fetch + Command argument
-            </div>
-
-        </div>
-
-
-        <div
-            class="bot"
-            id="streamelements"
-            onclick="selectBot('streamelements')"
-        >
-
-            <div class="bot-check">
-                ✓
-            </div>
-
-            <div class="bot-icon">
-                🟢
-            </div>
-
-            <div class="bot-name">
-                StreamElements
-            </div>
-
-            <div class="bot-description">
-                Одна готовая строка
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- COMMAND -->
-
-    <div class="command-area">
-
-        <div class="section-title">
-
-            <h2>
-                💬 Название команды
-            </h2>
-
-            <p>
-                Укажи команду, которую будут использовать зрители.
-            </p>
-
-        </div>
-
-
-        <label for="command">
-            Command
-        </label>
-
-        <input
-            id="command"
-            value="!dbd"
-            placeholder="!dbd"
-        >
-
-        <div class="input-help">
-            Можно использовать любое название:
-            !dbd, !стата, !stats и т.д.
-        </div>
-
-
-        <button
-            class="generate"
-            onclick="generate()"
-        >
-            ⚡ Создать настройку
-        </button>
-
-    </div>
-
-
-    <!-- RESULT -->
-
-    <div
-        class="result show"
-        id="result"
-    >
-
-        <div class="success">
-            ✓ Настройка готова.
-            Скопируй поля и вставь их в своего Twitch-бота.
-        </div>
-
-
-        <div class="result-title">
-
-            <h2 id="resultTitle">
-                ⚙️ Настройка Moobot
-            </h2>
-
-            <p id="resultDescription">
-                Custom Command + URL Fetch + Command argument 1
-            </p>
-
-        </div>
-
-
-        <!-- COMMAND -->
-
-        <div class="field">
-
-            <div class="field-header">
-
-                <span class="field-name">
-                    Command
-                </span>
-
-                <span class="field-info">
-                    Moobot / StreamElements
-                </span>
-
-            </div>
-
-            <div class="code">
-
-                <pre id="outCommand">!dbd</pre>
-
-                <button
-                    class="copy"
-                    onclick="copyText('outCommand', this)"
-                >
-                    📋 Копировать
-                </button>
+                <p>
+                    Выбери бота, которого используешь
+                    на своём канале.
+                </p>
 
             </div>
 
         </div>
 
 
-        <!-- MOOBOT SETTINGS -->
+        <div class="bot-grid">
 
-        <div id="moobotSettings">
+            <div
+                class="bot selected"
+                id="moobot"
+                onclick="selectBot('moobot')"
+            >
 
-            <div class="field">
+                <div class="bot-check">
+                    ✓
+                </div>
 
-                <div class="field-header">
+                <div class="bot-icon">
+                    🤖
+                </div>
 
-                    <span class="field-name">
-                        Response → URL to fetch
+                <div class="bot-name">
+                    Moobot
+                </div>
+
+                <div class="bot-description">
+                    Настройка через URL Fetch
+                </div>
+
+            </div>
+
+
+            <div
+                class="bot"
+                id="streamelements"
+                onclick="selectBot('streamelements')"
+            >
+
+                <div class="bot-check">
+                    ✓
+                </div>
+
+                <div class="bot-icon">
+                    🟢
+                </div>
+
+                <div class="bot-name">
+                    StreamElements
+                </div>
+
+                <div class="bot-description">
+                    Готовая строка для Response
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         STEP 2 + 3
+    ========================= -->
+
+    <section class="card">
+
+        <div class="step-title">
+
+            <div class="step-number">
+                2
+            </div>
+
+            <div>
+
+                <h2 id="configTitle">
+                    Настрой бота
+                </h2>
+
+                <p id="configDescription">
+                    Скопируй данные ниже и вставь их
+                    в настройки выбранного бота.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- =====================
+             MOOBOT
+        ====================== -->
+
+        <div id="moobotConfig">
+
+            <div class="config-box">
+
+                <div class="config-header">
+
+                    <span class="config-name">
+                        URL TO FETCH
                     </span>
 
-                    <span class="field-info">
-                        Full (plain) response
+                    <span class="config-place">
+                        Moobot → Response
                     </span>
 
                 </div>
 
-                <div class="code">
 
-                    <pre id="outUrl">
-https://dbd-bot-livid.vercel.app/api/dbd?steamid=
-                    </pre>
+                <div
+                    class="config-content"
+                    id="moobotUrl"
+                >
+                    https://dbd-bot-livid.vercel.app/api/dbd?steamid=
 
                     <button
                         class="copy"
-                        onclick="copyText('outUrl', this)"
+                        onclick="copyMoobotUrl(this)"
                     >
                         📋 Копировать
                     </button>
@@ -964,18 +1028,16 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
             </div>
 
 
-            <!-- VISUAL -->
+            <div class="url-builder">
 
-            <div class="visual">
-
-                <div class="visual-title">
-                    🔧 Собери URL в Moobot
+                <div class="url-builder-title">
+                    В Moobot добавь после URL → Command argument 1
                 </div>
 
 
-                <div class="moobot-box">
+                <div class="url-parts">
 
-                    <div class="moobot-part url">
+                    <div class="url-part">
                         https://dbd-bot-livid.vercel.app/api/dbd?steamid=
                     </div>
 
@@ -983,20 +1045,21 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
                         +
                     </div>
 
-                    <div class="moobot-part argument">
+                    <div class="url-part argument">
                         Command argument 1
                     </div>
 
                 </div>
 
 
-                <div class="note">
+                <div class="warning">
 
-                    ⚠️ <strong>Важно:</strong>
+                    ⚠️
+                    <strong>Важно:</strong>
 
                     между
                     <strong>=</strong>
-                    и блоком
+                    и
                     <strong>Command argument 1</strong>
                     пробела быть не должно.
 
@@ -1005,97 +1068,90 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
             </div>
 
 
-            <!-- MOOBOT STEPS -->
-
-            <div class="steps">
-
-                <h3>
-                    📋 Как настроить Moobot
-                </h3>
+            <div class="instructions" style="margin-top:22px;">
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         1
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         Создай новую
-                        <strong>Custom Command</strong>.
+                        <strong>Custom Command</strong>
+                        в Moobot.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         2
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         В поле
                         <strong>Command</strong>
-                        укажи команду.
+                        укажи
+                        <strong>!dbd</strong>.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         3
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
-                        В строке
+                        В
                         <strong>Response</strong>
-                        выбери:
-
-                        <strong>
-                            URL fetch → Full (plain) response
-                        </strong>
+                        выбери
+                        <strong>URL fetch → Full (plain) response</strong>.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         4
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
-                        В поле
+                        В
                         <strong>URL to fetch</strong>
-                        вставь URL из блока выше.
+                        вставь URL выше.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         5
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         Сразу после
                         <strong>=</strong>
-                        добавь блок
+                        добавь
                         <strong>Command argument 1</strong>.
 
                         Пробела между ними быть не должно.
@@ -1105,13 +1161,13 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         6
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         Сохрани команду.
 
@@ -1124,34 +1180,39 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
         </div>
 
 
-        <!-- STREAMELEMENTS -->
+        <!-- =====================
+             STREAMELEMENTS
+        ====================== -->
 
         <div
-            id="streamelementsSettings"
+            id="streamelementsConfig"
             style="display:none;"
         >
 
-            <div class="field">
+            <div class="config-box">
 
-                <div class="field-header">
+                <div class="config-header">
 
-                    <span class="field-name">
-                        Reply
+                    <span class="config-name">
+                        RESPONSE
                     </span>
 
-                    <span class="field-info">
-                        Одна строка
+                    <span class="config-place">
+                        StreamElements → Response
                     </span>
 
                 </div>
 
-                <div class="code">
 
-                    <pre id="outStreamElements"></pre>
+                <div
+                    class="config-content"
+                    id="streamElementsCode"
+                >
+                    $(customapi https://dbd-bot-livid.vercel.app/api/dbd?steamid=$(queryescape $(1:)))
 
                     <button
                         class="copy"
-                        onclick="copyText('outStreamElements', this)"
+                        onclick="copyStreamElements(this)"
                     >
                         📋 Копировать
                     </button>
@@ -1161,70 +1222,71 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
             </div>
 
 
-            <div class="steps">
+            <div
+                class="instructions"
+                style="margin-top:22px;"
+            >
 
-                <h3>
-                    📋 Как настроить StreamElements
-                </h3>
 
+                <div class="instruction">
 
-                <div class="step">
-
-                    <div class="step-number">
+                    <div class="instruction-number">
                         1
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         Создай новую
-                        <strong>Custom Command</strong>.
+                        <strong>Custom Command</strong>
+                        в StreamElements.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         2
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         В поле
                         <strong>Command</strong>
-                        укажи команду.
+                        укажи
+                        <strong>!dbd</strong>.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         3
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         В поле
-                        <strong>Response / Reply</strong>
-                        вставь одну готовую строку выше.
+                        <strong>Response</strong>
+                        вставь готовую строку выше.
 
                     </div>
 
                 </div>
 
 
-                <div class="step">
+                <div class="instruction">
 
-                    <div class="step-number">
+                    <div class="instruction-number">
                         4
                     </div>
 
-                    <div class="step-text">
+                    <div class="instruction-text">
 
                         Сохрани команду.
 
@@ -1237,52 +1299,200 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
         </div>
 
 
-        <!-- EXAMPLE -->
+        <div class="success">
 
-        <div class="example">
+            ✓ После сохранения бот готов.
+            Дополнительная настройка DBD Bot не требуется.
 
-            <div class="example-label">
-                💬 Пример использования зрителем
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         STEP 3
+    ========================= -->
+
+    <section class="card">
+
+        <div class="step-title">
+
+            <div class="step-number">
+                3
             </div>
 
-            <div
-                class="example-command"
-                id="viewerCommand"
-            >
-                !dbd https://steamcommunity.com/profiles/76561199849381839/
+            <div>
+
+                <h2>
+                    Проверь команду
+                </h2>
+
+                <p>
+                    Теперь зритель может отправить
+                    ссылку на любой Steam-профиль.
+                </p>
+
             </div>
 
         </div>
 
 
-        <!-- NOTE -->
+        <div class="usage-info">
 
-        <div class="note">
+            В Twitch-чате используется команда:
 
-            💡 Зрителю не нужно ничего настраивать.
+            <br><br>
 
-            Он просто пишет команду и после неё
-            вставляет ссылку на нужный Steam-профиль.
+            <strong>!dbd</strong>
+            + ссылка на Steam-профиль.
 
             <br><br>
 
             Например:
 
             <strong>
-                !dbd https://steamcommunity.com/profiles/...
+                !dbd https://steamcommunity.com/id/cr1stalz_kz/
             </strong>
 
         </div>
 
-    </div>
+    </section>
 
-</div>
+
+    <!-- =========================
+         STEP 4
+    ========================= -->
+
+    <section class="card">
+
+        <div class="step-title">
+
+            <div class="step-number">
+                4
+            </div>
+
+            <div>
+
+                <h2>
+                    Пример в Twitch-чате
+                </h2>
+
+                <p>
+                    Вот как это будет выглядеть для зрителей.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="twitch-chat">
+
+
+            <div class="chat-header">
+                # twitch-chat
+            </div>
+
+
+            <div class="chat-body">
+
+
+                <!-- VIEWER -->
+
+                <div class="chat-message">
+
+                    <span class="viewer-name">
+                        Viewer123:
+                    </span>
+
+                    <span class="chat-command">
+                        !dbd https://steamcommunity.com/id/cr1stalz_kz/
+                    </span>
+
+                </div>
+
+
+                <!-- BOT -->
+
+                <div class="chat-message">
+
+                    <span class="bot-name-chat">
+                        Cr1stalz_
+                    </span>
+
+                    <span class="bot-badge">
+                        BOT
+                    </span>
+
+                    <span class="chat-response">
+                        :
+                    </span>
+
+                    <div class="stats">
+
+                        👤 Cr1stalz |
+                        ⏱ 746.5 ч |
+                        🔪 Ранг убийцы: Бронза III |
+                        🧑 Ранг выжившего: Бронза I |
+                        ☠️ Убийства: 1451 |
+                        🏃 Побеги: 899 |
+                        ⭐ Макс. престиж: 58 |
+                        ⚙️ Генераторов: 3190 |
+                        🩸 Очки крови: 256.19 млн
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+
+            <div class="chat-input">
+
+                <div class="fake-input">
+                    Отправить сообщение...
+                </div>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="usage-info">
+
+            💡 Зрителю не нужно знать SteamID.
+
+            Он просто вставляет ссылку на Steam-профиль
+            после команды <strong>!dbd</strong>.
+
+            <br><br>
+
+            Можно использовать ссылку:
+
+            <strong>
+                https://steamcommunity.com/id/cr1stalz_kz/
+            </strong>
+
+            или ссылку на профиль другого пользователя.
+
+        </div>
+
+    </section>
+
 
 </main>
 
 
 <footer>
-    🎮 DBD Bot • Twitch Steam Statistics
+
+    🎮 DBD Bot
+
+    <br><br>
+
+    Discord: @cr1stalz
+
 </footer>
 
 
@@ -1290,6 +1500,7 @@ https://dbd-bot-livid.vercel.app/api/dbd?steamid=
 
 const API_URL =
     "https://dbd-bot-livid.vercel.app/api/dbd?steamid=";
+
 
 let selectedBot = "moobot";
 
@@ -1302,12 +1513,14 @@ function selectBot(bot) {
 
     selectedBot = bot;
 
+
     document
         .getElementById("moobot")
         .classList.toggle(
             "selected",
             bot === "moobot"
         );
+
 
     document
         .getElementById("streamelements")
@@ -1316,123 +1529,100 @@ function selectBot(bot) {
             bot === "streamelements"
         );
 
-    generate();
+
+    updatePage();
+
 }
 
 
 /* =========================
-   GET COMMAND
+   UPDATE
 ========================= */
 
-function getCommand() {
+function updatePage() {
 
-    let command =
-        document
-            .getElementById("command")
-            .value
-            .trim();
-
-    if (!command) {
-        command = "!dbd";
-    }
-
-    if (!command.startsWith("!")) {
-        command = "!" + command;
-    }
-
-    return command;
-}
-
-
-/* =========================
-   GENERATE
-========================= */
-
-function generate() {
-
-    const command = getCommand();
+    const isMoobot =
+        selectedBot === "moobot";
 
 
     document
-        .getElementById("command")
-        .value = command;
+        .getElementById("moobotConfig")
+        .style.display =
+            isMoobot
+                ? "block"
+                : "none";
 
 
     document
-        .getElementById("outCommand")
-        .textContent = command;
+        .getElementById("streamelementsConfig")
+        .style.display =
+            isMoobot
+                ? "none"
+                : "block";
 
 
-    document
-        .getElementById("viewerCommand")
-        .textContent =
-            command +
-            " https://steamcommunity.com/profiles/76561199849381839/";
-
-
-    if (selectedBot === "moobot") {
+    if (isMoobot) {
 
         document
-            .getElementById("resultTitle")
+            .getElementById("configTitle")
             .textContent =
-                "⚙️ Настройка Moobot";
+                "Настрой Moobot";
+
 
         document
-            .getElementById("resultDescription")
+            .getElementById("configDescription")
             .textContent =
-                "Custom Command + URL Fetch + Command argument 1";
-
-
-        document
-            .getElementById("moobotSettings")
-            .style.display = "block";
-
-        document
-            .getElementById("streamelementsSettings")
-            .style.display = "none";
-
-
-        document
-            .getElementById("outUrl")
-            .textContent =
-                API_URL;
+                "Скопируй URL и вставь его в Response → URL fetch.";
 
 
     } else {
 
         document
-            .getElementById("resultTitle")
+            .getElementById("configTitle")
             .textContent =
-                "⚙️ Настройка StreamElements";
+                "Настрой StreamElements";
+
 
         document
-            .getElementById("resultDescription")
+            .getElementById("configDescription")
             .textContent =
-                "Одна Custom Command без отдельного поля аргумента.";
-
-
-        document
-            .getElementById("moobotSettings")
-            .style.display = "none";
-
-        document
-            .getElementById("streamelementsSettings")
-            .style.display = "block";
-
-
-        document
-            .getElementById("outStreamElements")
-            .textContent =
-                "$(customapi " +
-                API_URL +
-                "$(queryescape $(1:)))";
+                "Скопируй готовую строку и вставь её в Response.";
 
     }
 
+}
 
-    document
-        .getElementById("result")
-        .classList.add("show");
+
+/* =========================
+   COPY MOOBOT
+========================= */
+
+async function copyMoobotUrl(button) {
+
+    await copyText(
+        API_URL,
+        button
+    );
+
+}
+
+
+/* =========================
+   COPY STREAMELEMENTS
+========================= */
+
+async function copyStreamElements(button) {
+
+    const text =
+        "$(customapi " +
+        API_URL +
+        "$(queryescape $(1:)))";
+
+
+    await copyText(
+        text,
+        button
+    );
 
 }
 
@@ -1441,17 +1631,7 @@ function generate() {
    COPY
 ========================= */
 
-async function copyText(
-    elementId,
-    button
-) {
-
-    const text =
-        document
-            .getElementById(elementId)
-            .textContent
-            .trim();
-
+async function copyText(text, button) {
 
     try {
 
@@ -1466,7 +1646,9 @@ async function copyText(
 
         textarea.value = text;
 
-        document.body.appendChild(textarea);
+        document.body.appendChild(
+            textarea
+        );
 
         textarea.select();
 
@@ -1496,28 +1678,10 @@ async function copyText(
 
 
 /* =========================
-   ENTER
-========================= */
-
-document
-    .getElementById("command")
-    .addEventListener(
-        "keydown",
-        function(event) {
-
-            if (event.key === "Enter") {
-                generate();
-            }
-
-        }
-    );
-
-
-/* =========================
    START
 ========================= */
 
-generate();
+updatePage();
 
 </script>
 

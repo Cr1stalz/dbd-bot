@@ -46,16 +46,8 @@ export default async function handler(req, res) {
     const profileData = await profileResponse.json();
     const statsData = await statsResponse.json();
 
-    // =========================
-    // ИМЯ
-    // =========================
-
     const player = profileData?.response?.players?.[0];
     const nickname = player?.personaname || "Steam";
-
-    // =========================
-    // ВРЕМЯ ИГРЫ
-    // =========================
 
     let playtime = "Время игры скрыто";
 
@@ -68,24 +60,14 @@ export default async function handler(req, res) {
           game => Number(game.appid) === 381210
         );
 
-        if (
-          dbdGame &&
-          dbdGame.playtime_forever != null
-        ) {
-          const hours =
-            Number(dbdGame.playtime_forever) / 60;
-
+        if (dbdGame && dbdGame.playtime_forever != null) {
+          const hours = Number(dbdGame.playtime_forever) / 60;
           playtime = `${hours.toFixed(1)} ч`;
         }
       }
     }
 
-    // =========================
-    // СТАТИСТИКА DBD
-    // =========================
-
-    const stats =
-      statsData?.playerstats?.stats || [];
+    const stats = statsData?.playerstats?.stats || [];
 
     function getStat(name) {
       const stat = stats.find(
@@ -98,9 +80,7 @@ export default async function handler(req, res) {
 
       const value = Number(stat.value);
 
-      return Number.isFinite(value)
-        ? value
-        : 0;
+      return Number.isFinite(value) ? value : 0;
     }
 
     const killerPips =
@@ -115,98 +95,48 @@ export default async function handler(req, res) {
     const sacrificed =
       getStat("DBD_SacrificedCampers");
 
+    const totalKills =
+      killed + sacrificed;
+
     const generators =
       getStat("DBD_GeneratorPct_float");
 
     const maxPrestige =
       getStat("DBD_BloodwebMaxPrestigeLevel");
 
-    // =========================
-    // ПИПСЫ → РАНГ DBD
-    // =========================
-
     function getRank(pips) {
-      if (pips < 21) {
-        return "Пепел IV";
-      }
-
-      if (pips <= 22) {
-        return "Бронза IV";
-      }
-
-      if (pips <= 24) {
-        return "Бронза III";
-      }
-
-      if (pips <= 26) {
-        return "Бронза II";
-      }
-
-      if (pips <= 28) {
-        return "Бронза I";
-      }
-
-      if (pips <= 33) {
-        return "Серебро IV";
-      }
-
-      if (pips <= 38) {
-        return "Серебро III";
-      }
-
-      if (pips <= 43) {
-        return "Серебро II";
-      }
-
-      if (pips <= 48) {
-        return "Серебро I";
-      }
-
-      if (pips <= 53) {
-        return "Золото IV";
-      }
-
-      if (pips <= 58) {
-        return "Золото III";
-      }
-
-      if (pips <= 63) {
-        return "Золото II";
-      }
-
-      if (pips <= 68) {
-        return "Золото I";
-      }
-
-      if (pips <= 73) {
-        return "Радужный IV";
-      }
-
-      if (pips <= 78) {
-        return "Радужный III";
-      }
-
-      if (pips <= 83) {
-        return "Радужный II";
-      }
-
+      if (pips < 21) return "Пепел IV";
+      if (pips <= 22) return "Бронза IV";
+      if (pips <= 24) return "Бронза III";
+      if (pips <= 26) return "Бронза II";
+      if (pips <= 28) return "Бронза I";
+      if (pips <= 33) return "Серебро IV";
+      if (pips <= 38) return "Серебро III";
+      if (pips <= 43) return "Серебро II";
+      if (pips <= 48) return "Серебро I";
+      if (pips <= 53) return "Золото IV";
+      if (pips <= 58) return "Золото III";
+      if (pips <= 63) return "Золото II";
+      if (pips <= 68) return "Золото I";
+      if (pips <= 73) return "Радужный IV";
+      if (pips <= 78) return "Радужный III";
+      if (pips <= 83) return "Радужный II";
       return "Радужный I";
     }
 
-    const killerRank = getRank(killerPips);
-    const survivorRank = getRank(survivorPips);
+    const killerRank =
+      getRank(killerPips);
 
-    // =========================
-    // ОТВЕТ
-    // =========================
+    const survivorRank =
+      getRank(survivorPips);
 
     const message =
       `👤 ${nickname}` +
       ` | ⏱ ${playtime}` +
       ` | 🔪 ${killerRank}` +
       ` | 🧑 ${survivorRank}` +
-      ` | ☠️ Убийства/жертвы: ${killed}/${sacrificed}` +
-      ` | ⚙️ Генераторов: ${generators.toFixed(1)}` +
+      ` | ☠️ Убийства+жертвы: ${totalKills}` +
+      ` | ⚙️ Генераторов: ${Math.round(generators)}` +
       ` | 🩸 Макс. престиж: ${maxPrestige}`;
 
     res.setHeader(
@@ -219,7 +149,9 @@ export default async function handler(req, res) {
       "s-maxage=60, stale-while-revalidate=300"
     );
 
-    return res.status(200).send(message);
+    return res
+      .status(200)
+      .send(message);
 
   } catch (error) {
     console.error(error);
@@ -229,3 +161,4 @@ export default async function handler(req, res) {
       .send("❌ Ошибка при получении данных.");
   }
 }
+```

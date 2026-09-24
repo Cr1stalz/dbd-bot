@@ -1,5 +1,8 @@
 export default async function handler(req, res) {
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader(
+    "Content-Type",
+    "text/plain; charset=utf-8"
+  );
 
   let input = String(req.query?.steamid || "").trim();
 
@@ -12,7 +15,7 @@ export default async function handler(req, res) {
   input = cleanInput(input);
 
   try {
-    // 1. Получаем SteamID64
+    // Получаем SteamID64
     const steamId = await resolveSteamId(input);
 
     console.log("INPUT:", input);
@@ -24,7 +27,7 @@ export default async function handler(req, res) {
       );
     }
 
-    // 2. Получаем всё остальное параллельно
+    // Получаем ник, часы и DBD одновременно
     const [nickname, hours, dbd] = await Promise.all([
       getSteamNickname(steamId),
       getSteamHours(steamId),
@@ -37,15 +40,24 @@ export default async function handler(req, res) {
       );
     }
 
-    // 3. Формируем ответ
+    const survivor = rankName(dbd.survivor_rank);
+    const killer = rankName(dbd.killer_rank);
+
+    const gens = toNumber(dbd.gensrepaired);
+    const escapes = toNumber(dbd.escaped);
+
+    const totalKills =
+      toNumber(dbd.sacrificed) +
+      toNumber(dbd.killed);
+
     const result =
       `🎮 Статистика игрока [${nickname}] | ` +
       `⏱ ${hours} | ` +
-      `🧑 ${rankName(dbd.survivor_rank)} | ` +
-      `🔪 ${rankName(dbd.killer_rank)} | ` +
-      `🛠 Гены: ${toNumber(dbd.gensrepaired)} | ` +
-      `🚪 Побеги: ${toNumber(dbd.escaped)} | ` +
-      `💀 Убито: ${toNumber(dbd.sacrificed) + toNumber(dbd.killed)}`;
+      `🧑 ${survivor} | ` +
+      `🔪 ${killer} | ` +
+      `🛠 Гены: ${gens} | ` +
+      `🚪 Побеги: ${escapes} | ` +
+      `💀 Убито: ${totalKills}`;
 
     return res.status(200).send(result);
 
@@ -59,9 +71,9 @@ export default async function handler(req, res) {
 }
 
 
-/* =========================
-   INPUT
-========================= */
+/* =========================================================
+   ОЧИСТКА INPUT
+========================================================= */
 
 function cleanInput(input) {
   return String(input)
@@ -71,19 +83,19 @@ function cleanInput(input) {
 }
 
 
-/* =========================
-   STEAM ID
-========================= */
+/* =========================================================
+   ПОЛУЧЕНИЕ STEAMID64
+========================================================= */
 
 async function resolveSteamId(input) {
   let value = cleanInput(input);
 
-  // Прямой SteamID64
+  // Если сразу передан SteamID64
   if (isSteamId(value)) {
     return value;
   }
 
-  // Steam URL
+  // Если передана ссылка Steam
   if (/steamcommunity\.com/i.test(value)) {
     try {
       const url = new URL(value);
@@ -101,16 +113,22 @@ async function resolveSteamId(input) {
 
       // /profiles/7656119...
       if (type === "profiles") {
-        return isSteamId(value) ? value : null;
+        return isSteamId(value)
+          ? value
+          : null;
       }
 
-      // Нам нужен /id/...
+      // Поддерживаем /id/...
       if (type !== "id") {
         return null;
       }
 
     } catch (error) {
-      console.error("Ошибка URL:", error);
+      console.error(
+        "Ошибка разбора Steam URL:",
+        error
+      );
+
       return null;
     }
   }
@@ -118,10 +136,10 @@ async function resolveSteamId(input) {
   const encoded = encodeURIComponent(value);
 
   /*
-   * Сначала XML.
-   * Если Steam редиректит на /profiles/...
-   * response.url уже будет содержать настоящий SteamID.
+   * Первый способ:
+   * Steam XML + автоматический редирект.
    */
+
   try {
     const response = await fetch(
       `https://steamcommunity.com/id/${encoded}/?xml=1`,
@@ -133,11 +151,20 @@ async function resolveSteamId(input) {
       }
     );
 
-    console.log("STEAM STATUS:", response.status);
-    console.log("STEAM FINAL URL:", response.url);
+    console.log(
+      "STEAM XML STATUS:",
+      response.status
+    );
+
+    console.log(
+      "STEAM XML URL:",
+      response.url
+    );
 
     // Проверяем конечный URL после редиректа
-    const idFromUrl = extractSteamId(response.url);
+    const idFromUrl = extractSteamId(
+      response.url
+    );
 
     if (idFromUrl) {
       return idFromUrl;
@@ -145,7 +172,7 @@ async function resolveSteamId(input) {
 
     const body = await response.text();
 
-    // SteamID64 в XML/HTML
+    // Ищем SteamID64 в XML
     const idFromBody = extractSteamId(body);
 
     if (idFromBody) {
@@ -153,28 +180,46 @@ async function resolveSteamId(input) {
     }
 
   } catch (error) {
-    console.error("Ошибка Steam XML:", error);
+    console.error(
+      "Ошибка Steam XML:",
+      error
+    );
   }
 
+
   /*
-   * Дополнительный fallback:
-   * обычная страница профиля.
+   * Второй способ:
+   * Обычная страница Steam.
    */
+
   try {
     const response = await fetch(
       `https://steamcommunity.com/id/${encoded}/`,
       {
         headers: {
-          "User-Agent": "Mozilla/5.0"
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         },
         cache: "no-store"
       }
     );
 
-    console.log("STEAM HTML STATUS:", response.status);
-    console.log("STEAM HTML URL:", response.url);
+    console.log(
+      "STEAM HTML STATUS:",
+      response.status
+    );
 
-    const idFromUrl = extractSteamId(response.url);
+    console.log(
+      "STEAM HTML URL:",
+      response.url
+    );
+
+    // Steam мог перенаправить на /profiles/...
+    const idFromUrl = extractSteamId(
+      response.url
+    );
 
     if (idFromUrl) {
       return idFromUrl;
@@ -182,6 +227,7 @@ async function resolveSteamId(input) {
 
     const html = await response.text();
 
+    // Ищем SteamID64 в HTML
     const idFromHtml = extractSteamId(html);
 
     if (idFromHtml) {
@@ -189,12 +235,19 @@ async function resolveSteamId(input) {
     }
 
   } catch (error) {
-    console.error("Ошибка Steam HTML:", error);
+    console.error(
+      "Ошибка Steam HTML:",
+      error
+    );
   }
 
   return null;
 }
 
+
+/* =========================================================
+   ПОИСК STEAMID64
+========================================================= */
 
 function extractSteamId(text) {
   if (!text) {
@@ -205,7 +258,9 @@ function extractSteamId(text) {
     /7656119\d{10}/
   );
 
-  return match ? match[0] : null;
+  return match
+    ? match[0]
+    : null;
 }
 
 
@@ -214,48 +269,134 @@ function isSteamId(value) {
 }
 
 
-/* =========================
-   STEAM NICKNAME
-========================= */
+/* =========================================================
+   ПОЛУЧЕНИЕ НИКА STEAM
+========================================================= */
 
 async function getSteamNickname(steamId) {
   try {
     const response = await fetch(
-      `https://steamcommunity.com/profiles/${steamId}/?xml=1`,
+      `https://steamcommunity.com/profiles/${steamId}/`,
       {
         headers: {
-          "User-Agent": "Mozilla/5.0"
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         },
         cache: "no-store"
       }
+    );
+
+    console.log(
+      "NICK STATUS:",
+      response.status
     );
 
     if (!response.ok) {
       return "Неизвестно";
     }
 
-    const xml = await response.text();
+    const html = await response.text();
 
-    const match = xml.match(
+    /*
+     * 1. Основной способ:
+     * <meta property="og:title" content="Ник">
+     */
+
+    let match = html.match(
+      /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i
+    );
+
+    if (match?.[1]) {
+      const nickname = decodeHtml(
+        match[1].trim()
+      );
+
+      if (nickname) {
+        return nickname;
+      }
+    }
+
+    /*
+     * Иногда атрибуты идут в другом порядке:
+     * content="Ник" property="og:title"
+     */
+
+    match = html.match(
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i
+    );
+
+    if (match?.[1]) {
+      const nickname = decodeHtml(
+        match[1].trim()
+      );
+
+      if (nickname) {
+        return nickname;
+      }
+    }
+
+    /*
+     * 2. Старый Steam XML
+     */
+
+    match = html.match(
       /<steamID>([\s\S]*?)<\/steamID>/i
     );
 
-    if (!match?.[1]) {
-      return "Неизвестно";
+    if (match?.[1]) {
+      const nickname = decodeHtml(
+        match[1].trim()
+      );
+
+      if (nickname) {
+        return nickname;
+      }
     }
 
-    return decodeHtml(match[1].trim());
+    /*
+     * 3. Title страницы
+     */
+
+    match = html.match(
+      /<title>([\s\S]*?)<\/title>/i
+    );
+
+    if (match?.[1]) {
+      let title = decodeHtml(
+        match[1].trim()
+      );
+
+      title = title
+        .replace(
+          /\s*::\s*Steam Community.*$/i,
+          ""
+        )
+        .trim();
+
+      if (
+        title &&
+        !/^Steam Community$/i.test(title)
+      ) {
+        return title;
+      }
+    }
 
   } catch (error) {
-    console.error("Ошибка ника:", error);
-    return "Неизвестно";
+    console.error(
+      "Ошибка получения ника:",
+      error
+    );
   }
+
+  return "Неизвестно";
 }
 
 
-/* =========================
+/* =========================================================
    STEAM HOURS
-========================= */
+========================================================= */
 
 async function getSteamHours(steamId) {
   try {
@@ -272,9 +413,13 @@ async function getSteamHours(steamId) {
       return "Время игры скрыто";
     }
 
-    const text = (await response.text()).trim();
+    const text = (
+      await response.text()
+    ).trim();
 
-    const match = text.match(/[\d.,]+/);
+    const match = text.match(
+      /[\d.,]+/
+    );
 
     if (!match) {
       return "Время игры скрыто";
@@ -284,7 +429,10 @@ async function getSteamHours(steamId) {
       match[0].replace(",", ".")
     );
 
-    if (!Number.isFinite(hours) || hours <= 0) {
+    if (
+      !Number.isFinite(hours) ||
+      hours <= 0
+    ) {
       return "Время игры скрыто";
     }
 
@@ -293,15 +441,19 @@ async function getSteamHours(steamId) {
       .replace(/\.0$/, "")} ч`;
 
   } catch (error) {
-    console.error("Ошибка часов:", error);
+    console.error(
+      "Ошибка получения часов:",
+      error
+    );
+
     return "Время игры скрыто";
   }
 }
 
 
-/* =========================
-   DBD
-========================= */
+/* =========================================================
+   DBD СТАТИСТИКА
+========================================================= */
 
 async function getDbdStats(steamId) {
   try {
@@ -311,60 +463,104 @@ async function getDbdStats(steamId) {
       )}`,
       {
         method: "GET",
+
         headers: {
           "User-Agent": "Mozilla/5.0",
           "Accept": "application/json"
         },
+
         cache: "no-store"
       }
     );
 
-    if (!response.ok) {
-      console.error(
-        "DBD STATUS:",
-        response.status
-      );
+    console.log(
+      "DBD STATUS:",
+      response.status
+    );
 
+    if (!response.ok) {
       return null;
     }
 
     const data = await response.json();
 
-    if (!data || typeof data !== "object") {
+    if (
+      !data ||
+      typeof data !== "object"
+    ) {
       return null;
     }
 
     return data;
 
   } catch (error) {
-    console.error("Ошибка DBD API:", error);
+    console.error(
+      "Ошибка DBD API:",
+      error
+    );
+
     return null;
   }
 }
 
 
-/* =========================
-   HELPERS
-========================= */
+/* =========================================================
+   ЧИСЛА
+========================================================= */
 
 function toNumber(value) {
   const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
+
+  return Number.isFinite(number)
+    ? number
+    : 0;
 }
 
+
+/* =========================================================
+   HTML / CDATA
+========================================================= */
 
 function decodeHtml(text) {
   return String(text)
-    .replace(/^<!\[CDATA\[/, "")
-    .replace(/\]\]>$/, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/gi, "'");
+    .replace(
+      /^<!\[CDATA\[/,
+      ""
+    )
+    .replace(
+      /\]\]>$/,
+      ""
+    )
+    .replace(
+      /&amp;/g,
+      "&"
+    )
+    .replace(
+      /&lt;/g,
+      "<"
+    )
+    .replace(
+      /&gt;/g,
+      ">"
+    )
+    .replace(
+      /&quot;/g,
+      '"'
+    )
+    .replace(
+      /&#39;/g,
+      "'"
+    )
+    .replace(
+      /&#x27;/gi,
+      "'"
+    );
 }
 
+
+/* =========================================================
+   РАНГИ DBD
+========================================================= */
 
 function rankName(rank) {
   const ranks = {
@@ -394,5 +590,8 @@ function rankName(rank) {
     1: "Радужный I"
   };
 
-  return ranks[Number(rank)] || "Неизвестно";
+  return (
+    ranks[Number(rank)] ||
+    "Неизвестно"
+  );
 }

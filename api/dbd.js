@@ -11,10 +11,6 @@ export default async function handler(req, res) {
       return res.status(400).send("❌ SteamID не настроен.");
     }
 
-    // =========================
-    // STEAM API
-    // =========================
-
     const profileUrl =
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?` +
       `key=${encodeURIComponent(apiKey)}` +
@@ -55,9 +51,7 @@ export default async function handler(req, res) {
     // =========================
 
     const player = profileData?.response?.players?.[0];
-
-    const nickname =
-      player?.personaname || "Steam";
+    const nickname = player?.personaname || "Steam";
 
     // =========================
     // ВРЕМЯ ИГРЫ
@@ -109,19 +103,11 @@ export default async function handler(req, res) {
         : 0;
     }
 
-    // =========================
-    // РАНГОВЫЕ ПИПСЫ
-    // =========================
-
     const killerPips =
       getStat("DBD_KillerSkulls");
 
     const survivorPips =
       getStat("DBD_CamperSkulls");
-
-    // =========================
-    // ОСНОВНАЯ СТАТИСТИКА
-    // =========================
 
     const killed =
       getStat("DBD_KilledCampers");
@@ -129,23 +115,32 @@ export default async function handler(req, res) {
     const sacrificed =
       getStat("DBD_SacrificedCampers");
 
-    const escapes =
-      getStat("DBD_Escape");
-
-    const hatchEscapes =
-      getStat("DBD_EscapeThroughHatch");
-
-    const skillChecks =
-      getStat("DBD_SkillCheckSuccess");
-
-    const unhooks =
-      getStat("DBD_UnhookOrHeal");
-
     const generators =
       getStat("DBD_GeneratorPct_float");
 
-    const bloodwebPrestige =
+    const maxPrestige =
       getStat("DBD_BloodwebMaxPrestigeLevel");
+
+    // =========================
+    // ПИПСЫ → СТАРЫЙ РАНГ DBD
+    // =========================
+
+    /*
+      ВАЖНО:
+
+      DBD_KillerSkulls и DBD_CamperSkulls
+      являются количеством пипсов.
+
+      Steam не хранит отдельным полем
+      современный текущий Grade.
+
+      Поэтому здесь НЕ делаем ложное
+      преобразование 21/28 в текущий Grade.
+    */
+
+    function pipInfo(pips) {
+      return `${pips} пип.`;
+    }
 
     // =========================
     // ОТВЕТ
@@ -154,16 +149,12 @@ export default async function handler(req, res) {
     const message =
       `👤 ${nickname}` +
       ` | ⏱ ${playtime}` +
-      ` | 🔪 Пипсы убийцы: ${killerPips}` +
-      ` | 🧑 Пипсы выжившего: ${survivorPips}` +
+      ` | 🔪 ${pipInfo(killerPips)}` +
+      ` | 🧑 ${pipInfo(survivorPips)}` +
       ` | ☠️ Убито: ${killed}` +
-      ` | 🪝 Принесено в жертву: ${sacrificed}` +
-      ` | 🚪 Побегов: ${escapes}` +
-      ` | 🕳️ Через люк: ${hatchEscapes}` +
-      ` | 🎯 Скиллчеков: ${skillChecks}` +
-      ` | ❤️ Лечений/анхуков: ${unhooks}` +
+      ` | 🪝 Жертв: ${sacrificed}` +
       ` | ⚙️ Генераторов: ${generators.toFixed(1)}` +
-      ` | 🩸 Престиж: ${bloodwebPrestige}`;
+      ` | 🩸 Макс. престиж: ${maxPrestige}`;
 
     res.setHeader(
       "Content-Type",

@@ -11,6 +11,10 @@ export default async function handler(req, res) {
       return res.status(400).send("❌ SteamID не настроен.");
     }
 
+    // =========================
+    // STEAM API
+    // =========================
+
     const profileUrl =
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?` +
       `key=${encodeURIComponent(apiKey)}` +
@@ -22,27 +26,34 @@ export default async function handler(req, res) {
       `&steamid=${encodeURIComponent(steamId)}` +
       `&format=json&include_appinfo=true`;
 
-    const statsUrl =
-      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/?` +
-      `appid=381210` +
-      `&key=${encodeURIComponent(apiKey)}` +
-      `&steamid=${encodeURIComponent(steamId)}` +
-      `&format=json`;
+    // =========================
+    // NIGHTLIGHT API
+    // =========================
 
-    const [profileResponse, gamesResponse, statsResponse] =
-      await Promise.all([
-        fetch(profileUrl),
-        fetch(gamesUrl),
-        fetch(statsUrl)
-      ]);
+    const survivorGradeUrl =
+      `https://api.nightlight.gg/v1/steam-stats/${encodeURIComponent(steamId)}/stats/survivor_grade?format=plain`;
 
-    if (!profileResponse.ok || !gamesResponse.ok || !statsResponse.ok) {
+    const killerGradeUrl =
+      `https://api.nightlight.gg/v1/steam-stats/${encodeURIComponent(steamId)}/stats/killer_grade?format=plain`;
+
+    const [
+      profileResponse,
+      gamesResponse,
+      survivorGradeResponse,
+      killerGradeResponse
+    ] = await Promise.all([
+      fetch(profileUrl),
+      fetch(gamesUrl),
+      fetch(survivorGradeUrl),
+      fetch(killerGradeUrl)
+    ]);
+
+    // Steam profile обязателен.
+    if (!profileResponse.ok) {
       return res.status(502).send("❌ Ошибка Steam API.");
     }
 
     const profileData = await profileResponse.json();
-    const gamesData = await gamesResponse.json();
-    const statsData = await statsResponse.json();
 
     // =========================
     // ИМЯ
@@ -55,82 +66,49 @@ export default async function handler(req, res) {
     // ВРЕМЯ ИГРЫ
     // =========================
 
-    const games = gamesData?.response?.games;
-
     let playtime = "Время игры скрыто";
 
-    if (Array.isArray(games)) {
-      const dbdGame = games.find(
-        game => Number(game.appid) === 381210
-      );
+    if (gamesResponse.ok) {
+      const gamesData = await gamesResponse.json();
+      const games = gamesData?.response?.games;
 
-      if (
-        dbdGame &&
-        dbdGame.playtime_forever != null
-      ) {
-        const hours = Number(dbdGame.playtime_forever) / 60;
-        playtime = `${hours.toFixed(1)} ч`;
+      if (Array.isArray(games)) {
+        const dbdGame = games.find(
+          game => Number(game.appid) === 381210
+        );
+
+        if (
+          dbdGame &&
+          dbdGame.playtime_forever != null
+        ) {
+          const hours = Number(dbdGame.playtime_forever) / 60;
+          playtime = `${hours.toFixed(1)} ч`;
+        }
       }
     }
-
-    // =========================
-    // STEAM СТАТИСТИКА DBD
-    // =========================
-
-    const stats = statsData?.playerstats?.stats || [];
-
-    function getStat(name) {
-      const stat = stats.find(item => item.name === name);
-
-      if (!stat || stat.value == null) {
-        return null;
-      }
-
-      const value = Number(stat.value);
-
-      return Number.isFinite(value) ? value : null;
-    }
-
-    // Настоящие поля Grade.
-    const killerGradeValue =
-      getStat("DBD_SlasherTierIncrement");
-
-    const survivorGradeValue =
-      getStat("DBD_UnlockRanking");
 
     // =========================
     // GRADE
     // =========================
 
-    /*
-      Steam хранит Grade как числовое значение.
+    let killerRank = "Нет данных";
+    let survivorRank = "Нет данных";
 
-      ВАЖНО:
-      DBD_KillerSkulls и DBD_CamperSkulls здесь
-      специально НЕ используются.
+    if (killerGradeResponse.ok) {
+      const text = (await killerGradeResponse.text()).trim();
 
-      Если Steam не отдаёт соответствующее поле,
-      показываем "Нет данных", а не выдумываем Grade.
-    */
-
-    function getGrade(value) {
-      if (value === null) {
-        return "Нет данных";
+      if (text && !text.startsWith("{")) {
+        killerRank = translateGrade(text);
       }
-
-      /*
-        На этом этапе не делаем неправильное
-        преобразование большого накопительного значения
-        напрямую в Bronze/Silver/Gold.
-
-        Значение сохраняем для диагностики.
-      */
-
-      return `Steam: ${value}`;
     }
 
-    const killerRank = getGrade(killerGradeValue);
-    const survivorRank = getGrade(survivorGradeValue);
+    if (survivorGradeResponse.ok) {
+      const text = (await survivorGradeResponse.text()).trim();
+
+      if (text && !text.startsWith("{")) {
+        survivorRank = translateGrade(text);
+      }
+    }
 
     // =========================
     // ОТВЕТ
@@ -161,4 +139,40 @@ export default async function handler(req, res) {
       .status(500)
       .send("❌ Ошибка при получении данных.");
   }
+}
+
+
+// =========================
+// ПЕРЕВОД GRADE НА РУССКИЙ
+// =========================
+
+function translateGrade(grade) {
+  const grades = {
+    "Ash IV": "Пепел IV",
+    "Ash III": "Пепел III",
+    "Ash II": "Пепел II",
+    "Ash I": "Пепел I",
+
+    "Bronze IV": "Бронза IV",
+    "Bronze III": "Бронза III",
+    "Bronze II": "Бронза II",
+    "Bronze I": "Бронза I",
+
+    "Silver IV": "Серебро IV",
+    "Silver III": "Серебро III",
+    "Silver II": "Серебро II",
+    "Silver I": "Серебро I",
+
+    "Gold IV": "Золото IV",
+    "Gold III": "Золото III",
+    "Gold II": "Золото II",
+    "Gold I": "Золото I",
+
+    "Iridescent IV": "Радужный IV",
+    "Iridescent III": "Радужный III",
+    "Iridescent II": "Радужный II",
+    "Iridescent I": "Радужный I"
+  };
+
+  return grades[grade] || grade;
 }

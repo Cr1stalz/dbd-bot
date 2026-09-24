@@ -23,11 +23,11 @@ export default async function handler(req, res) {
 
     if (!steamId) {
       return res.status(200).send(
-        "❌ Ссылка на профиль недействительна или профиль закрыт"
+        "❌ Ссылка на профиль недействительна или профиль закрыт."
       );
     }
 
-    // Получаем ник, часы и статистику одновременно
+    // Получаем ник, часы и DBD одновременно
     const [nickname, hours, dbd] = await Promise.all([
       getSteamNickname(steamId),
       getSteamHours(steamId),
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
     if (!dbd) {
       return res.status(200).send(
-        "❌ Не удалось получить статистику профиля"
+        "❌ Не удалось получить статистику профиля. Повторите попытку через 5 минут."
       );
     }
 
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     );
 
     return res.status(200).send(
-      "❌ Не удалось получить статистику профиля"
+      "❌ Не удалось получить статистику профиля. Повторите попытку через 5 минут."
     );
   }
 }
@@ -112,7 +112,6 @@ async function resolveSteamId(input) {
       }
 
       const type = parts[0].toLowerCase();
-
       value = parts[1];
 
       // /profiles/7656119...
@@ -164,7 +163,7 @@ async function resolveSteamId(input) {
       response.url
     );
 
-    // Проверяем URL после редиректа
+    // URL после редиректа
     const idFromUrl = extractSteamId(
       response.url
     );
@@ -175,9 +174,8 @@ async function resolveSteamId(input) {
 
     const body = await response.text();
 
-    const idFromBody = extractSteamId(
-      body
-    );
+    // SteamID64 в XML
+    const idFromBody = extractSteamId(body);
 
     if (idFromBody) {
       return idFromBody;
@@ -191,7 +189,7 @@ async function resolveSteamId(input) {
   }
 
   // ========================================================
-  // 2. Обычная Steam страница
+  // 2. Обычная страница Steam
   // ========================================================
 
   try {
@@ -229,9 +227,8 @@ async function resolveSteamId(input) {
 
     const html = await response.text();
 
-    const idFromHtml = extractSteamId(
-      html
-    );
+    // SteamID64 в HTML
+    const idFromHtml = extractSteamId(html);
 
     if (idFromHtml) {
       return idFromHtml;
@@ -302,62 +299,81 @@ async function getSteamNickname(steamId) {
 
     const html = await response.text();
 
+    // ======================================================
     // 1. og:title
+    // ======================================================
+
     let match = html.match(
       /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i
     );
 
+    if (!match?.[1]) {
+      match = html.match(
+        /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i
+      );
+    }
+
     if (match?.[1]) {
-      const nickname = decodeHtml(
+      let nickname = decodeHtml(
         match[1].trim()
       );
+
+      // Убираем Steam Community ::
+      nickname = nickname
+        .replace(
+          /^Steam Community\s*::\s*/i,
+          ""
+        )
+        .trim();
 
       if (nickname) {
         return nickname;
       }
     }
 
-    // 2. content -> og:title
-    match = html.match(
-      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i
-    );
+    // ======================================================
+    // 2. Старый XML steamID
+    // ======================================================
 
-    if (match?.[1]) {
-      const nickname = decodeHtml(
-        match[1].trim()
-      );
-
-      if (nickname) {
-        return nickname;
-      }
-    }
-
-    // 3. Старый XML формат
     match = html.match(
       /<steamID>([\s\S]*?)<\/steamID>/i
     );
 
     if (match?.[1]) {
-      const nickname = decodeHtml(
+      let nickname = decodeHtml(
         match[1].trim()
       );
+
+      nickname = nickname
+        .replace(
+          /^Steam Community\s*::\s*/i,
+          ""
+        )
+        .trim();
 
       if (nickname) {
         return nickname;
       }
     }
 
-    // 4. Title
+    // ======================================================
+    // 3. Title страницы
+    // ======================================================
+
     match = html.match(
       /<title>([\s\S]*?)<\/title>/i
     );
 
     if (match?.[1]) {
-      let title = decodeHtml(
+      let nickname = decodeHtml(
         match[1].trim()
       );
 
-      title = title
+      nickname = nickname
+        .replace(
+          /^Steam Community\s*::\s*/i,
+          ""
+        )
         .replace(
           /\s*::\s*Steam Community.*$/i,
           ""
@@ -365,10 +381,10 @@ async function getSteamNickname(steamId) {
         .trim();
 
       if (
-        title &&
-        !/^Steam Community$/i.test(title)
+        nickname &&
+        !/^Steam Community$/i.test(nickname)
       ) {
-        return title;
+        return nickname;
       }
     }
 
@@ -384,7 +400,7 @@ async function getSteamNickname(steamId) {
 
 
 /* =========================================================
-   ЧАСЫ STEAM / DBD
+   ЧАСЫ
 ========================================================= */
 
 async function getSteamHours(steamId) {
@@ -415,20 +431,14 @@ async function getSteamHours(steamId) {
     );
 
     /*
-     * ВАЖНО:
-     * Ответ должен быть ТОЛЬКО числом.
+     * Принимаем только ответ,
+     * который полностью является числом.
      *
-     * Например:
-     * 828.8
-     * 1234
-     *
-     * Но:
+     * Поэтому SteamID:
      * 76561199057658704
-     * Steam ID
-     * Error
-     * Profile not found
      *
-     * не считаются часами.
+     * не сможет попасть сюда
+     * как количество часов.
      */
 
     if (
@@ -440,12 +450,6 @@ async function getSteamHours(steamId) {
     const hours = parseFloat(
       text.replace(",", ".")
     );
-
-    /*
-     * Дополнительная защита.
-     * DBD 100000 часов и больше
-     * практически невозможны.
-     */
 
     if (
       !Number.isFinite(hours) ||
@@ -482,7 +486,7 @@ async function getDbdStats(steamId) {
 
   try {
     // ======================================================
-    // 1. Первый запрос статистики
+    // 1. Обычный запрос статистики
     // ======================================================
 
     const response = await fetch(
@@ -525,8 +529,8 @@ async function getDbdStats(steamId) {
     }
 
     // ======================================================
-    // 2. Статистики нет.
-    // Запрашиваем профиль DBD
+    // 2. Если статистики нет,
+    //    делаем profile-запрос
     // ======================================================
 
     const profileUrl =
@@ -564,7 +568,6 @@ async function getDbdStats(steamId) {
         profileResponse.status
       );
 
-      // Читаем ответ, чтобы запрос полностью завершился
       await profileResponse.text();
 
     } catch (error) {

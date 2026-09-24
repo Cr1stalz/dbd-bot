@@ -130,7 +130,8 @@ export default async function handler(req, res) {
           `?key=${encodeURIComponent(API_KEY)}` +
           `&vanityurl=${encodeURIComponent(vanity)}`;
 
-        const resolveResponse = await fetch(resolveUrl);
+        const resolveResponse =
+          await fetch(resolveUrl);
 
         if (!resolveResponse.ok) {
           return res.status(200).send(
@@ -138,7 +139,8 @@ export default async function handler(req, res) {
           );
         }
 
-        const resolveData = await resolveResponse.json();
+        const resolveData =
+          await resolveResponse.json();
 
         if (
           !resolveData.response ||
@@ -150,7 +152,8 @@ export default async function handler(req, res) {
           );
         }
 
-        steamId = resolveData.response.steamid;
+        steamId =
+          resolveData.response.steamid;
       }
     }
 
@@ -168,7 +171,8 @@ export default async function handler(req, res) {
       `?key=${encodeURIComponent(API_KEY)}` +
       `&steamids=${encodeURIComponent(steamId)}`;
 
-    const profileResponse = await fetch(profileUrl);
+    const profileResponse =
+      await fetch(profileUrl);
 
     if (!profileResponse.ok) {
       return res.status(200).send(
@@ -176,7 +180,8 @@ export default async function handler(req, res) {
       );
     }
 
-    const profileData = await profileResponse.json();
+    const profileData =
+      await profileResponse.json();
 
     const player =
       profileData?.response?.players?.[0];
@@ -201,7 +206,6 @@ export default async function handler(req, res) {
         `?key=${encodeURIComponent(API_KEY)}` +
         `&steamid=${encodeURIComponent(steamId)}` +
         `&format=json` +
-        `&include_played_free_games=1` +
         `&include_appinfo=1`;
 
       const gamesResponse =
@@ -220,14 +224,11 @@ export default async function handler(req, res) {
               game => Number(game.appid) === 381210
             );
 
-          /*
-           * Если Steam вернул меньше 60 минут,
-           * не показываем 0.0 ч.
-           */
+          // Любое значение больше 0 минут показываем
           if (
             dbdGame &&
             typeof dbdGame.playtime_forever === "number" &&
-            dbdGame.playtime_forever >= 60
+            dbdGame.playtime_forever > 0
           ) {
             playtimeHours =
               dbdGame.playtime_forever / 60;
@@ -267,13 +268,13 @@ export default async function handler(req, res) {
       );
 
       return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
       );
     }
 
     if (!statsResponse.ok) {
       return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
       );
     }
 
@@ -284,7 +285,7 @@ export default async function handler(req, res) {
         await statsResponse.json();
     } catch (error) {
       return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
       );
     }
 
@@ -296,7 +297,7 @@ export default async function handler(req, res) {
       )
     ) {
       return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
       );
     }
 
@@ -357,7 +358,6 @@ export default async function handler(req, res) {
 
     // ==============================
     // Побеги
-    // Обычный выход + люк
     // ==============================
     const escapes =
       (stats.DBD_Escape || 0) +
@@ -383,6 +383,9 @@ export default async function handler(req, res) {
       ` | ⚙️ Генераторов: ${generators}` +
       ` | 🩸 Очки крови: ${formatNumber(bloodpoints)}`;
 
+    // ==============================
+    // Заголовки ответа
+    // ==============================
     res.setHeader(
       "Cache-Control",
       "s-maxage=60, stale-while-revalidate=300"

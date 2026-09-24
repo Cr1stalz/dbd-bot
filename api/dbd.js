@@ -23,11 +23,10 @@ export default async function handler(req, res) {
     } catch {}
 
     // =========================
-    // ОПРЕДЕЛЯЕМ STEAMID
+    // ОПРЕДЕЛЯЕМ STEAMID64
     // =========================
 
     if (!/^\d{17}$/.test(steamId)) {
-      // /profiles/7656119...
       const profileMatch = steamId.match(
         /steamcommunity\.com\/profiles\/(\d{17})/i
       );
@@ -35,7 +34,6 @@ export default async function handler(req, res) {
       if (profileMatch) {
         steamId = profileMatch[1];
       } else {
-        // /id/username
         const vanityMatch = steamId.match(
           /steamcommunity\.com\/id\/([^/?#]+)/i
         );
@@ -88,7 +86,7 @@ export default async function handler(req, res) {
     const appId = 381210;
 
     // =========================
-    // STEAM API
+    // STEAM API URL
     // =========================
 
     const profileUrl =
@@ -215,6 +213,9 @@ export default async function handler(req, res) {
       );
     }
 
+    // Любая ошибка Steam API
+    // при получении статистики DBD
+    // означает, что статистика недоступна.
     if (!statsResponse.ok) {
       return res.status(404).send(
         "❌ Профиль скрыт"
@@ -233,7 +234,7 @@ export default async function handler(req, res) {
     }
 
     // Steam может вернуть {}
-    // или объект без playerstats
+    // вместо playerstats
     if (
       !statsData ||
       !statsData.playerstats ||
@@ -248,6 +249,10 @@ export default async function handler(req, res) {
 
     const stats =
       statsData.playerstats.stats;
+
+    // =========================
+    // ПОЛУЧЕНИЕ СТАТА
+    // =========================
 
     function getStat(name) {
       const stat =
@@ -271,7 +276,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // СТАТИСТИКА
+    // DBD СТАТИСТИКА
     // =========================
 
     const killerPips =

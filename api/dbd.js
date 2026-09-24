@@ -135,7 +135,7 @@ export default async function handler(req, res) {
       ` | ⏱ ${playtime}` +
       ` | 🔪 ${killerRank}` +
       ` | 🧑 ${survivorRank}` +
-      ` | ☠️ Убийства+жертвы: ${totalKills}` +
+      ` | ☠️ Убийства: ${totalKills}` +
       ` | ⚙️ Генераторов: ${Math.round(generators)}` +
       ` | 🩸 Макс. престиж: ${maxPrestige}`;
 

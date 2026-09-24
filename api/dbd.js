@@ -31,8 +31,6 @@ export default async function handler(req, res) {
   function getGrade(pips) {
     pips = Number(pips) || 0;
 
-    if (pips < 0) pips = 0;
-
     if (pips <= 2) return "Пепел IV";
     if (pips <= 5) return "Пепел III";
     if (pips <= 9) return "Пепел II";
@@ -68,7 +66,7 @@ export default async function handler(req, res) {
 
     input = decodeURIComponent(input.trim());
 
-    // Просто SteamID64
+    // Прямой SteamID64
     if (/^\d{17}$/.test(input)) {
       return input;
     }
@@ -90,8 +88,9 @@ export default async function handler(req, res) {
     // Проверяем API ключ
     // ==============================
     if (!API_KEY) {
-      res.status(200).send("❌ STEAM_API_KEY не задан");
-      return;
+      return res.status(200).send(
+        "❌ STEAM_API_KEY не задан"
+      );
     }
 
     // ==============================
@@ -104,8 +103,9 @@ export default async function handler(req, res) {
     }
 
     if (!input) {
-      res.status(200).send("❌ Укажи Steam профиль");
-      return;
+      return res.status(200).send(
+        "❌ Укажи Steam профиль"
+      );
     }
 
     // ==============================
@@ -133,8 +133,9 @@ export default async function handler(req, res) {
         const resolveResponse = await fetch(resolveUrl);
 
         if (!resolveResponse.ok) {
-          res.status(200).send("❌ Профиль скрыт");
-          return;
+          return res.status(200).send(
+            "❌ Профиль скрыт"
+          );
         }
 
         const resolveData = await resolveResponse.json();
@@ -144,8 +145,9 @@ export default async function handler(req, res) {
           resolveData.response.success !== 1 ||
           !resolveData.response.steamid
         ) {
-          res.status(200).send("❌ Профиль скрыт");
-          return;
+          return res.status(200).send(
+            "❌ Профиль скрыт"
+          );
         }
 
         steamId = resolveData.response.steamid;
@@ -153,8 +155,9 @@ export default async function handler(req, res) {
     }
 
     if (!steamId) {
-      res.status(200).send("❌ Неверная ссылка Steam");
-      return;
+      return res.status(200).send(
+        "❌ Неверная ссылка Steam"
+      );
     }
 
     // ==============================
@@ -168,34 +171,27 @@ export default async function handler(req, res) {
     const profileResponse = await fetch(profileUrl);
 
     if (!profileResponse.ok) {
-      res.status(200).send("❌ Профиль скрыт");
-      return;
+      return res.status(200).send(
+        "❌ Профиль скрыт"
+      );
     }
 
-    let profileData;
+    const profileData = await profileResponse.json();
 
-    try {
-      profileData = await profileResponse.json();
-    } catch (error) {
-      res.status(200).send("❌ Профиль скрыт");
-      return;
-    }
-
-    const player = profileData?.response?.players?.[0];
+    const player =
+      profileData?.response?.players?.[0];
 
     if (!player) {
-      res.status(200).send("❌ Профиль скрыт");
-      return;
+      return res.status(200).send(
+        "❌ Профиль скрыт"
+      );
     }
 
-    const nickname = player.personaname || "Неизвестно";
+    const nickname =
+      player.personaname || "Неизвестно";
 
     // ==============================
     // Получаем время игры DBD
-    //
-    // Dead by Daylight — бесплатная игра.
-    // Поэтому обязательно:
-    // include_played_free_games=1
     // ==============================
     let playtimeHours = null;
 
@@ -206,29 +202,43 @@ export default async function handler(req, res) {
         `&steamid=${encodeURIComponent(steamId)}` +
         `&format=json` +
         `&include_played_free_games=1` +
-        `&include_appinfo=0` +
-        `&appids_filter[0]=381210`;
+        `&include_appinfo=1`;
 
-      const gamesResponse = await fetch(gamesUrl);
+      const gamesResponse =
+        await fetch(gamesUrl);
 
       if (gamesResponse.ok) {
-        const gamesData = await gamesResponse.json();
+        const gamesData =
+          await gamesResponse.json();
 
-        const dbdGame =
-          gamesData?.response?.games?.find(
-            game => Number(game.appid) === 381210
-          );
+        const games =
+          gamesData?.response?.games;
 
-        if (
-          dbdGame &&
-          typeof dbdGame.playtime_forever === "number"
-        ) {
-          playtimeHours =
-            dbdGame.playtime_forever / 60;
+        if (Array.isArray(games)) {
+          const dbdGame =
+            games.find(
+              game => Number(game.appid) === 381210
+            );
+
+          /*
+           * Если Steam вернул меньше 60 минут,
+           * не показываем 0.0 ч.
+           */
+          if (
+            dbdGame &&
+            typeof dbdGame.playtime_forever === "number" &&
+            dbdGame.playtime_forever >= 60
+          ) {
+            playtimeHours =
+              dbdGame.playtime_forever / 60;
+          }
         }
       }
     } catch (error) {
-      playtimeHours = null;
+      console.error(
+        "PLAYTIME ERROR:",
+        error
+      );
     }
 
     const playtimeText =
@@ -248,50 +258,58 @@ export default async function handler(req, res) {
     let statsResponse;
 
     try {
-      statsResponse = await fetch(statsUrl);
+      statsResponse =
+        await fetch(statsUrl);
     } catch (error) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      console.error(
+        "STATS ERROR:",
+        error
       );
-      return;
+
+      return res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
+      );
     }
 
     if (!statsResponse.ok) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      return res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
       );
-      return;
     }
 
     let statsData;
 
     try {
-      statsData = await statsResponse.json();
+      statsData =
+        await statsResponse.json();
     } catch (error) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      return res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
       );
-      return;
     }
 
     if (
       !statsData ||
       !statsData.playerstats ||
-      !Array.isArray(statsData.playerstats.stats)
+      !Array.isArray(
+        statsData.playerstats.stats
+      )
     ) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      return res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | ❌ Статистика DBD недоступна`
       );
-      return;
     }
 
     // ==============================
-    // Превращаем Steam stats в объект
+    // Преобразуем Steam stats в объект
     // ==============================
     const stats = {};
 
-    for (const item of statsData.playerstats.stats) {
-      stats[item.name] = Number(item.value) || 0;
+    for (
+      const item of statsData.playerstats.stats
+    ) {
+      stats[item.name] =
+        Number(item.value) || 0;
     }
 
     // ==============================
@@ -319,7 +337,8 @@ export default async function handler(req, res) {
       stats.DBD_SacrificedCampers || 0;
 
     const totalKills =
-      killedCampers + sacrificedCampers;
+      killedCampers +
+      sacrificedCampers;
 
     // ==============================
     // Генераторы
@@ -333,7 +352,8 @@ export default async function handler(req, res) {
     // Максимальный престиж
     // ==============================
     const maxPrestige =
-      stats.DBD_BloodwebMaxPrestigeLevel || 0;
+      stats.DBD_BloodwebMaxPrestigeLevel ||
+      0;
 
     // ==============================
     // Побеги
@@ -363,11 +383,28 @@ export default async function handler(req, res) {
       ` | ⚙️ Генераторов: ${generators}` +
       ` | 🩸 Очки крови: ${formatNumber(bloodpoints)}`;
 
-    res.status(200).send(result);
+    res.setHeader(
+      "Cache-Control",
+      "s-maxage=60, stale-while-revalidate=300"
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "text/plain; charset=utf-8"
+    );
+
+    return res
+      .status(200)
+      .send(result);
 
   } catch (error) {
-    console.error(error);
+    console.error(
+      "DBD API ERROR:",
+      error
+    );
 
-    res.status(200).send("❌ Профиль скрыт");
+    return res.status(200).send(
+      "❌ Профиль скрыт"
+    );
   }
 }

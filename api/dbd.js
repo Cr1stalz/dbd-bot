@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   }
 
   // ==============================
-  // Определение Grade по Pip'ам
+  // Определение Grade
   // ==============================
   function getGrade(pips) {
     pips = Number(pips) || 0;
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
 
     input = decodeURIComponent(input.trim());
 
-    // SteamID64
+    // Просто SteamID64
     if (/^\d{17}$/.test(input)) {
       return input;
     }
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
 
   try {
     // ==============================
-    // Проверка API ключа
+    // Проверяем API ключ
     // ==============================
     if (!API_KEY) {
       res.status(200).send("❌ STEAM_API_KEY не задан");
@@ -169,13 +169,20 @@ export default async function handler(req, res) {
 
     const profileResponse = await fetch(profileUrl);
 
-    // Именно профиль недоступен
+    // Сам профиль недоступен
     if (!profileResponse.ok) {
       res.status(200).send("❌ Профиль скрыт");
       return;
     }
 
-    const profileData = await profileResponse.json();
+    let profileData;
+
+    try {
+      profileData = await profileResponse.json();
+    } catch (error) {
+      res.status(200).send("❌ Профиль скрыт");
+      return;
+    }
 
     const player = profileData?.response?.players?.[0];
 
@@ -221,6 +228,14 @@ export default async function handler(req, res) {
     }
 
     // ==============================
+    // Текст времени
+    // ==============================
+    const playtimeText =
+      playtimeHours !== null
+        ? `⏱ ${playtimeHours.toFixed(1)} ч`
+        : `⏱ Время игры скрыто`;
+
+    // ==============================
     // Получаем статистику DBD
     // ==============================
     const statsUrl =
@@ -229,34 +244,52 @@ export default async function handler(req, res) {
       `&key=${encodeURIComponent(API_KEY)}` +
       `&steamid=${encodeURIComponent(steamId)}`;
 
-    const statsResponse = await fetch(statsUrl);
+    let statsResponse;
 
-    /*
-      Если Steam профиль существует,
-      но статистика DBD недоступна,
-      пишем именно "Список игр скрыт".
-    */
-    if (!statsResponse.ok) {
-      res.status(200).send("❌ Список игр скрыт");
+    try {
+      statsResponse = await fetch(statsUrl);
+    } catch (error) {
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      );
       return;
     }
 
+    // ==============================
+    // DBD статистика недоступна
+    // ==============================
+    if (!statsResponse.ok) {
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      );
+      return;
+    }
+
+    // ==============================
+    // Читаем JSON статистики
+    // ==============================
     let statsData;
 
     try {
       statsData = await statsResponse.json();
     } catch (error) {
-      res.status(200).send("❌ Список игр скрыт");
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      );
       return;
     }
 
-    // Steam может вернуть {}
+    // ==============================
+    // Steam вернул пустой объект
+    // ==============================
     if (
       !statsData ||
       !statsData.playerstats ||
       !Array.isArray(statsData.playerstats.stats)
     ) {
-      res.status(200).send("❌ Список игр скрыт");
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      );
       return;
     }
 
@@ -325,15 +358,7 @@ export default async function handler(req, res) {
       stats.DBD_BloodwebPoints || 0;
 
     // ==============================
-    // Время игры
-    // ==============================
-    const playtimeText =
-      playtimeHours !== null
-        ? `⏱ ${playtimeHours.toFixed(1)} ч`
-        : `⏱ Время игры скрыто`;
-
-    // ==============================
-    // Итог
+    // Итоговый результат
     // ==============================
     const result =
       `👤 ${nickname}` +
@@ -353,6 +378,15 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error(error);
+
+    // Если профиль уже определён,
+    // но произошла ошибка при получении DBD
+    if (typeof nickname !== "undefined") {
+      res.status(200).send(
+        `👤 ${nickname} | ⏱ Время игры скрыто | 🎮 Игры скрыты`
+      );
+      return;
+    }
 
     res.status(200).send("❌ Профиль скрыт");
   }

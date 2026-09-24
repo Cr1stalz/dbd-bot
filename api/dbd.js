@@ -6,9 +6,13 @@ export default async function handler(req, res) {
 
   const input = cleanInput(req.query?.steamid);
 
+  console.log("RAW QUERY:", req.query);
+  console.log("RAW STEAMID:", req.query?.steamid);
+  console.log("CLEAN INPUT:", input);
+
   if (!input) {
     return res.status(200).send(
-      "⚠️ Укажите SteamID или ссылку на профиль!"
+      "⚠️ Укажите SteamID, ник или ссылку на профиль!"
     );
   }
 
@@ -25,9 +29,6 @@ export default async function handler(req, res) {
       );
     }
 
-    /*
-     * Получаем ник, часы и DBD параллельно.
-     */
     const [
       nickname,
       hours,
@@ -42,9 +43,6 @@ export default async function handler(req, res) {
     console.log("FINAL HOURS:", hours);
     console.log("FINAL DBD:", dbd);
 
-    /*
-     * DBD PRIVATE
-     */
     if (dbd?.private === true) {
       return res.status(200).send(
         `🎮 Статистика игрока [${nickname}] | ` +
@@ -53,9 +51,6 @@ export default async function handler(req, res) {
       );
     }
 
-    /*
-     * DBD ERROR
-     */
     if (!dbd) {
       return res.status(200).send(
         "❌ Не удалось получить статистику профиля"
@@ -151,6 +146,15 @@ async function fetchWithTimeout(
 
 function cleanInput(value) {
   return String(value || "")
+    /*
+     * Удаляем невидимые Unicode-символы.
+     * В том числе символ ͏, который пришёл
+     * после !инфа.
+     */
+    .replace(
+      /[\u0000-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u2800\u3000\uFE00-\uFE0F\uFEFF]/g,
+      ""
+    )
     .trim()
     .replace(/^["']|["']$/g, "")
     .replace(
@@ -210,7 +214,6 @@ async function resolveSteamId(input) {
        * /profiles/7656119...
        */
       if (type === "profiles") {
-
         return isSteamId(value)
           ? value
           : null;
@@ -224,7 +227,6 @@ async function resolveSteamId(input) {
       }
 
     } catch (error) {
-
       console.error(
         "STEAM URL ERROR:",
         error
@@ -234,12 +236,12 @@ async function resolveSteamId(input) {
     }
   }
 
-  /*
-   * Пробуем XML
-   */
   const encoded =
     encodeURIComponent(value);
 
+  /*
+   * Сначала XML
+   */
   const xmlId =
     await fetchSteamId(
       `https://steamcommunity.com/id/${encoded}/?xml=1`
@@ -250,7 +252,7 @@ async function resolveSteamId(input) {
   }
 
   /*
-   * Запасной вариант
+   * Затем обычная страница
    */
   return fetchSteamId(
     `https://steamcommunity.com/id/${encoded}/`
@@ -289,8 +291,7 @@ async function fetchSteamId(url) {
     );
 
     /*
-     * Иногда Steam делает redirect
-     * прямо на /profiles/7656119...
+     * Steam redirect
      */
     const urlId =
       extractSteamId(
@@ -384,7 +385,7 @@ async function getSteamNickname(steamId) {
 
 
     /*
-     * 1. OG TITLE
+     * OG TITLE
      */
     let match =
       html.match(
@@ -412,7 +413,7 @@ async function getSteamNickname(steamId) {
 
 
     /*
-     * 2. Steam XML
+     * Steam XML
      */
     match =
       html.match(
@@ -433,7 +434,7 @@ async function getSteamNickname(steamId) {
 
 
     /*
-     * 3. TITLE
+     * TITLE
      */
     match =
       html.match(
@@ -535,7 +536,6 @@ async function getSteamHours(steamId) {
     );
 
     if (!response.ok) {
-
       return "Время игры скрыто";
     }
 
@@ -555,7 +555,6 @@ async function getSteamHours(steamId) {
       );
 
     if (!match) {
-
       return "Время игры скрыто";
     }
 
@@ -595,18 +594,15 @@ async function getSteamHours(steamId) {
 
 /*
  * ==========================================
- * DBD
+ * DBD STATS
  * ==========================================
  */
 
 async function getDbdStats(steamId) {
 
   /*
-   * ========================================
-   * ШАГ 1 — PROFILE
-   * ========================================
+   * PROFILE
    */
-
   const profileUrl =
     `https://dbd.tricky.lol/?json=profile&profile=${encodeURIComponent(
       steamId
@@ -633,8 +629,7 @@ async function getDbdStats(steamId) {
 
 
   /*
-   * Если profile API явно сообщает,
-   * что профиль приватный.
+   * Явно приватный профиль
    */
   if (
     isDbdPrivateProfile(profile)
@@ -651,11 +646,8 @@ async function getDbdStats(steamId) {
 
 
   /*
-   * ========================================
-   * ШАГ 2 — PLAYERSTATS
-   * ========================================
+   * PLAYERSTATS
    */
-
   const statsUrl =
     `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
       steamId
@@ -676,18 +668,10 @@ async function getDbdStats(steamId) {
     stats
   );
 
-
-  /*
-   * API не ответил
-   */
   if (!stats) {
     return null;
   }
 
-
-  /*
-   * Обрабатываем playerstats.
-   */
   return parseDbdResponse(
     stats,
     profile
@@ -697,7 +681,7 @@ async function getDbdStats(steamId) {
 
 /*
  * ==========================================
- * PROFILE PRIVATE
+ * PRIVATE PROFILE
  * ==========================================
  */
 
@@ -718,13 +702,7 @@ function isDbdPrivateProfile(data) {
 
 
   /*
-   * ВАЖНО:
-   *
-   * result = 1 означает,
-   * что профиль найден.
-   *
-   * Поэтому result = 1
-   * никогда не считаем private.
+   * result = 1 -> профиль найден
    */
   if (
     Number(data.result) === 1
@@ -733,9 +711,6 @@ function isDbdPrivateProfile(data) {
   }
 
 
-  /*
-   * Явное сообщение private.
-   */
   if (
     message.includes(
       "appears to be private"
@@ -796,7 +771,6 @@ async function fetchJson(url) {
     );
 
     if (!response.ok) {
-
       return null;
     }
 
@@ -844,7 +818,7 @@ async function fetchJson(url) {
 
 /*
  * ==========================================
- * ОБРАБОТКА PLAYERSTATS
+ * ОБРАБОТКА DBD
  * ==========================================
  */
 
@@ -862,16 +836,12 @@ function parseDbdResponse(
 
 
   /*
-   * ========================================
-   * ЕСЛИ PROFILE API СКАЗАЛ result = 1
+   * Если PROFILE вернул result = 1,
+   * профиль считаем публичным.
    *
-   * Профиль НЕ private.
-   *
-   * Никакие нули playerstats
-   * здесь не имеют значения.
-   * ========================================
+   * Нули в отдельных статистиках
+   * ничего не меняют.
    */
-
   if (
     profile &&
     Number(profile.result) === 1
@@ -886,11 +856,8 @@ function parseDbdResponse(
 
 
   /*
-   * ========================================
-   * ЯВНОЕ PRIVATE В PLAYERSTATS
-   * ========================================
+   * Проверка сообщения playerstats
    */
-
   const message =
     String(
       data.message || ""
@@ -907,6 +874,10 @@ function parseDbdResponse(
     message === "private"
   ) {
 
+    console.log(
+      ">>> DBD PRIVATE BY MESSAGE <<<"
+    );
+
     return {
       private: true
     };
@@ -914,16 +885,8 @@ function parseDbdResponse(
 
 
   /*
-   * ========================================
-   * ПРОВЕРКА ПУСТОГО PLAYERSTATS
-   *
-   * Теперь мы НЕ считаем все нули.
-   *
-   * Смотрим именно на характерную
-   * комбинацию приватного профиля.
-   * ========================================
+   * Характерный пустой JSON
    */
-
   if (
     isEmptyPrivateDbdStats(data)
   ) {
@@ -939,11 +902,8 @@ function parseDbdResponse(
 
 
   /*
-   * ========================================
-   * ПРОВЕРКА НАЛИЧИЯ СТАТИСТИКИ
-   * ========================================
+   * Проверяем наличие статистики
    */
-
   const hasStats =
     data.survivor_rank != null ||
     data.killer_rank != null ||
@@ -953,45 +913,24 @@ function parseDbdResponse(
     data.killed != null ||
     data.playtime != null;
 
-
   if (!hasStats) {
-
     return null;
   }
 
-
-  /*
-   * Нормальная статистика.
-   */
   return data;
 }
 
 
 /*
  * ==========================================
- * ОПРЕДЕЛЕНИЕ ПУСТОГО PRIVATE JSON
- * ==========================================
- *
- * Характерный ответ:
- *
- * survivor_rank = 20
- * killer_rank   = 20
- * playtime      = 0
- * updated_at    = 0
- * bloodpoints   = 0
- *
- * И практически все игровые показатели = 0.
- *
- * ВАЖНО:
- *
- * Не проверяем просто количество нулей.
+ * ПУСТОЙ PRIVATE JSON
  * ==========================================
  */
 
 function isEmptyPrivateDbdStats(data) {
 
   /*
-   * Должны присутствовать основные поля.
+   * Основные поля должны существовать.
    */
   if (
     data.survivor_rank == null ||
@@ -1004,21 +943,18 @@ function isEmptyPrivateDbdStats(data) {
 
 
   /*
-   * Приватный пустой профиль обычно
-   * имеет оба ранга на 20.
+   * Оба ранга = 20
    */
-  const ranksAreEmpty =
-    Number(data.survivor_rank) === 20 &&
-    Number(data.killer_rank) === 20;
-
-
-  if (!ranksAreEmpty) {
+  if (
+    Number(data.survivor_rank) !== 20 ||
+    Number(data.killer_rank) !== 20
+  ) {
     return false;
   }
 
 
   /*
-   * Время игры должно быть 0.
+   * Нет игрового времени
    */
   if (
     Number(data.playtime) !== 0
@@ -1028,7 +964,7 @@ function isEmptyPrivateDbdStats(data) {
 
 
   /*
-   * updated_at должен быть 0.
+   * Нет даты обновления
    */
   if (
     Number(data.updated_at) !== 0
@@ -1038,19 +974,9 @@ function isEmptyPrivateDbdStats(data) {
 
 
   /*
-   * Считаем только реальные игровые
-   * статистические поля.
-   *
-   * Не учитываем:
-   *
-   * steamid
-   * hash
-   * created_at
-   * updated_at
-   * playtime
-   * banstate
+   * Поля, которые не являются
+   * обычной игровой статистикой.
    */
-
   const ignoredFields = new Set([
     "steamid",
     "hash",
@@ -1076,20 +1002,13 @@ function isEmptyPrivateDbdStats(data) {
       continue;
     }
 
-
-    /*
-     * Учитываем только числовые
-     * статистические значения.
-     */
     if (
       typeof value !== "number"
     ) {
       continue;
     }
 
-
     statisticFields++;
-
 
     if (
       value === 0
@@ -1111,10 +1030,8 @@ function isEmptyPrivateDbdStats(data) {
 
 
   /*
-   * Для приватного JSON почти все
-   * статистические поля нулевые.
-   *
-   * Используем 95%.
+   * Если минимум 95% статистических
+   * полей равны 0 — считаем JSON пустым.
    */
   if (
     statisticFields > 50 &&
@@ -1123,7 +1040,6 @@ function isEmptyPrivateDbdStats(data) {
       statisticFields
     ) >= 0.95
   ) {
-
     return true;
   }
 
@@ -1134,7 +1050,7 @@ function isEmptyPrivateDbdStats(data) {
 
 /*
  * ==========================================
- * ЧИСЛО
+ * NUMBER
  * ==========================================
  */
 
@@ -1153,7 +1069,7 @@ function toNumber(value) {
 
 /*
  * ==========================================
- * HTML / CDATA
+ * HTML
  * ==========================================
  */
 

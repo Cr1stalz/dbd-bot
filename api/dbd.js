@@ -4,7 +4,9 @@ export default async function handler(req, res) {
     "text/plain; charset=utf-8"
   );
 
-  const input = cleanInput(req.query?.steamid);
+  const input = cleanInput(
+    req.query?.steamid
+  );
 
   if (!input) {
     return res.status(200).send(
@@ -13,8 +15,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Получаем SteamID
-    const steamId = await resolveSteamId(input);
+    // =====================================================
+    // STEAM ID
+    // =====================================================
+
+    const steamId =
+      await resolveSteamId(input);
 
     console.log("INPUT:", input);
     console.log("STEAM ID:", steamId);
@@ -25,14 +31,24 @@ export default async function handler(req, res) {
       );
     }
 
-    // Получаем всё параллельно
-    const [nickname, hours, dbd] = await Promise.all([
+    // =====================================================
+    // ПОЛУЧАЕМ НИК + ЧАСЫ + DBD ПАРАЛЛЕЛЬНО
+    // =====================================================
+
+    const [
+      nickname,
+      hours,
+      dbd
+    ] = await Promise.all([
       getSteamNickname(steamId),
       getSteamHours(steamId),
       getDbdStats(steamId)
     ]);
 
-    // DBD закрыт
+    // =====================================================
+    // DBD PRIVATE
+    // =====================================================
+
     if (dbd?.private) {
       return res.status(200).send(
         `🎮 Статистика игрока [${nickname}] | ` +
@@ -41,32 +57,51 @@ export default async function handler(req, res) {
       );
     }
 
-    // DBD не отвечает
+    // =====================================================
+    // DBD ERROR
+    // =====================================================
+
     if (!dbd) {
       return res.status(200).send(
         "❌ Не удалось получить статистику профиля"
       );
     }
 
-    const survivor = rankName(
-      dbd.survivor_rank
-    );
+    // =====================================================
+    // STATS
+    // =====================================================
 
-    const killer = rankName(
-      dbd.killer_rank
-    );
+    const survivor =
+      rankName(
+        dbd.survivor_rank
+      );
 
-    const gens = toNumber(
-      dbd.gensrepaired
-    );
+    const killer =
+      rankName(
+        dbd.killer_rank
+      );
 
-    const escapes = toNumber(
-      dbd.escaped
-    );
+    const gens =
+      toNumber(
+        dbd.gensrepaired
+      );
+
+    const escapes =
+      toNumber(
+        dbd.escaped
+      );
 
     const kills =
-      toNumber(dbd.sacrificed) +
-      toNumber(dbd.killed);
+      toNumber(
+        dbd.sacrificed
+      ) +
+      toNumber(
+        dbd.killed
+      );
+
+    // =====================================================
+    // RESULT
+    // =====================================================
 
     return res.status(200).send(
       `🎮 Статистика игрока [${nickname}] | ` +
@@ -92,14 +127,14 @@ export default async function handler(req, res) {
 
 
 /* =========================================================
-   НАСТРОЙКИ
+   SETTINGS
 ========================================================= */
 
 const TIMEOUT = 4000;
 
 
 /* =========================================================
-   FETCH С ТАЙМАУТОМ
+   FETCH WITH TIMEOUT
 ========================================================= */
 
 async function fetchWithTimeout(
@@ -117,12 +152,14 @@ async function fetchWithTimeout(
     );
 
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      cache: "no-store"
-    });
-
+    return await fetch(
+      url,
+      {
+        ...options,
+        signal: controller.signal,
+        cache: "no-store"
+      }
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -130,13 +167,16 @@ async function fetchWithTimeout(
 
 
 /* =========================================================
-   INPUT
+   CLEAN INPUT
 ========================================================= */
 
 function cleanInput(value) {
   return String(value || "")
     .trim()
-    .replace(/^["']|["']$/g, "")
+    .replace(
+      /^["']|["']$/g,
+      ""
+    )
     .replace(
       /^https?:\/\//i,
       "https://"
@@ -145,20 +185,29 @@ function cleanInput(value) {
 
 
 /* =========================================================
-   ПОЛУЧЕНИЕ STEAMID
+   RESOLVE STEAM ID
 ========================================================= */
 
 async function resolveSteamId(input) {
+  // Уже SteamID64
   if (isSteamId(input)) {
     return input;
   }
 
   let value = input;
 
-  // Steam URL
-  if (/steamcommunity\.com/i.test(value)) {
+  // =====================================================
+  // STEAM URL
+  // =====================================================
+
+  if (
+    /steamcommunity\.com/i.test(
+      value
+    )
+  ) {
     try {
-      const url = new URL(value);
+      const url =
+        new URL(value);
 
       const parts =
         url.pathname
@@ -172,7 +221,8 @@ async function resolveSteamId(input) {
       const type =
         parts[0].toLowerCase();
 
-      value = parts[1];
+      value =
+        parts[1];
 
       // /profiles/7656119...
       if (type === "profiles") {
@@ -199,7 +249,10 @@ async function resolveSteamId(input) {
   const encoded =
     encodeURIComponent(value);
 
-  // Сначала XML
+  // =====================================================
+  // STEAM XML
+  // =====================================================
+
   const xmlId =
     await fetchSteamId(
       `https://steamcommunity.com/id/${encoded}/?xml=1`
@@ -209,7 +262,10 @@ async function resolveSteamId(input) {
     return xmlId;
   }
 
-  // Затем обычная страница
+  // =====================================================
+  // STEAM HTML
+  // =====================================================
+
   return fetchSteamId(
     `https://steamcommunity.com/id/${encoded}/`
   );
@@ -217,7 +273,7 @@ async function resolveSteamId(input) {
 
 
 /* =========================================================
-   ПОИСК STEAMID НА СТРАНИЦЕ
+   FETCH STEAM ID
 ========================================================= */
 
 async function fetchSteamId(url) {
@@ -243,7 +299,7 @@ async function fetchSteamId(url) {
       response.url
     );
 
-    // SteamID из URL
+    // SteamID из URL после редиректа
     const urlId =
       extractSteamId(
         response.url
@@ -257,7 +313,9 @@ async function fetchSteamId(url) {
     const body =
       await response.text();
 
-    return extractSteamId(body);
+    return extractSteamId(
+      body
+    );
 
   } catch (error) {
     console.error(
@@ -273,7 +331,7 @@ async function fetchSteamId(url) {
 
 
 /* =========================================================
-   EXTRACT STEAMID
+   EXTRACT STEAM ID
 ========================================================= */
 
 function extractSteamId(text) {
@@ -296,10 +354,12 @@ function isSteamId(value) {
 
 
 /* =========================================================
-   НИК STEAM
+   STEAM NICKNAME
 ========================================================= */
 
-async function getSteamNickname(steamId) {
+async function getSteamNickname(
+  steamId
+) {
   try {
     const response =
       await fetchWithTimeout(
@@ -355,7 +415,7 @@ async function getSteamNickname(steamId) {
     }
 
     // =====================================================
-    // STEAMID XML
+    // STEAM ID XML
     // =====================================================
 
     match =
@@ -415,6 +475,10 @@ async function getSteamNickname(steamId) {
 }
 
 
+/* =========================================================
+   CLEAN NICKNAME
+========================================================= */
+
 function cleanNickname(value) {
   return decodeHtml(value)
     .replace(
@@ -426,10 +490,12 @@ function cleanNickname(value) {
 
 
 /* =========================================================
-   ЧАСЫ STEAM — DECAPI
+   STEAM HOURS — DECAPI
 ========================================================= */
 
-async function getSteamHours(steamId) {
+async function getSteamHours(
+  steamId
+) {
   try {
     const url =
       `https://decapi.me/steam/hours/${encodeURIComponent(
@@ -441,7 +507,8 @@ async function getSteamHours(steamId) {
         url,
         {
           headers: {
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent":
+              "Mozilla/5.0"
           }
         }
       );
@@ -455,30 +522,42 @@ async function getSteamHours(steamId) {
       return "Время игры скрыто";
     }
 
-    const text = (
-      await response.text()
-    ).trim();
+    const text =
+      (
+        await response.text()
+      ).trim();
 
     console.log(
       "DECAPI HOURS RESPONSE:",
       text
     );
 
-    // Ищем число в ответе DecAPI:
-    // 746.53 hours
-    // 746.53
-    // 746,53 hours
-    const match = text.match(
-      /(\d+(?:[.,]\d+)?)/
-    );
+    /*
+      DecAPI может вернуть:
+
+      746.53 hours
+      746.5 hours
+      746 hours
+      746.53
+      746,53 hours
+    */
+
+    const match =
+      text.match(
+        /(\d+(?:[.,]\d+)?)/
+      );
 
     if (!match) {
       return "Время игры скрыто";
     }
 
-    const hours = Number(
-      match[1].replace(",", ".")
-    );
+    const hours =
+      Number(
+        match[1].replace(
+          ",",
+          "."
+        )
+      );
 
     if (
       !Number.isFinite(hours) ||
@@ -490,7 +569,10 @@ async function getSteamHours(steamId) {
 
     return `${hours
       .toFixed(1)
-      .replace(/\.0$/, "")} ч`;
+      .replace(
+        /\.0$/,
+        ""
+      )} ч`;
 
   } catch (error) {
     console.error(
@@ -506,33 +588,15 @@ async function getSteamHours(steamId) {
 
 
 /* =========================================================
-   DBD СТАТИСТИКА
+   DBD STATS
 ========================================================= */
 
-async function getDbdStats(steamId) {
-  const statsUrl =
-    `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
-      steamId
-    )}`;
+async function getDbdStats(
+  steamId
+) {
 
   // =====================================================
-  // 1. PLAYERSTATS
-  // =====================================================
-
-  const first =
-    await fetchJson(statsUrl);
-
-  if (first) {
-    const result =
-      parseDbdResponse(first);
-
-    if (result) {
-      return result;
-    }
-  }
-
-  // =====================================================
-  // 2. PROFILE FALLBACK
+  // 1. СНАЧАЛА PROFILE
   // =====================================================
 
   const profileUrl =
@@ -546,20 +610,81 @@ async function getDbdStats(steamId) {
   );
 
   const profile =
-    await fetchJson(profileUrl);
+    await fetchJson(
+      profileUrl
+    );
 
   if (profile) {
-    return parseDbdResponse(
+    console.log(
+      "DBD PROFILE DATA:",
       profile
     );
+
+    // ===================================================
+    // PRIVATE
+    // ===================================================
+
+    if (
+      Number(profile.result) === 0
+    ) {
+      const message =
+        String(
+          profile.message || ""
+        ).toLowerCase();
+
+      if (
+        message.includes(
+          "private"
+        ) ||
+        message.includes(
+          "don't have any stats"
+        ) ||
+        message.includes(
+          "no stats"
+        )
+      ) {
+        console.log(
+          "DBD PROFILE IS PRIVATE"
+        );
+
+        return {
+          private: true
+        };
+      }
+    }
   }
 
-  return null;
+  // =====================================================
+  // 2. PLAYERSTATS
+  // =====================================================
+
+  const statsUrl =
+    `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
+      steamId
+    )}`;
+
+  console.log(
+    "DBD STATS REQUEST:",
+    statsUrl
+  );
+
+  const stats =
+    await fetchJson(
+      statsUrl
+    );
+
+  if (!stats) {
+    return null;
+  }
+
+  return parseDbdResponse(
+    stats
+  );
 }
 
 
 /* =========================================================
-   JSON FETCH С ТАЙМАУТОМ
+   FETCH JSON
 ========================================================= */
 
 async function fetchJson(url) {
@@ -597,7 +722,9 @@ async function fetchJson(url) {
     );
 
     try {
-      return JSON.parse(text);
+      return JSON.parse(
+        text
+      );
     } catch (error) {
       console.error(
         "JSON PARSE ERROR:",
@@ -621,10 +748,12 @@ async function fetchJson(url) {
 
 
 /* =========================================================
-   ОБРАБОТКА DBD RESPONSE
+   PARSE DBD RESPONSE
 ========================================================= */
 
-function parseDbdResponse(data) {
+function parseDbdResponse(
+  data
+) {
   if (
     !data ||
     typeof data !== "object"
@@ -632,7 +761,10 @@ function parseDbdResponse(data) {
     return null;
   }
 
-  // Закрытая статистика
+  // =====================================================
+  // PRIVATE / ERROR
+  // =====================================================
+
   if (
     Number(data.result) === 0
   ) {
@@ -642,7 +774,9 @@ function parseDbdResponse(data) {
       ).toLowerCase();
 
     if (
-      message.includes("private") ||
+      message.includes(
+        "private"
+      ) ||
       message.includes(
         "don't have any stats"
       ) ||
@@ -658,7 +792,10 @@ function parseDbdResponse(data) {
     return null;
   }
 
-  // Нормальная статистика
+  // =====================================================
+  // NORMAL STATS
+  // =====================================================
+
   return data;
 }
 
@@ -671,7 +808,9 @@ function toNumber(value) {
   const number =
     Number(value);
 
-  return Number.isFinite(number)
+  return Number.isFinite(
+    number
+  )
     ? number
     : 0;
 }
@@ -719,7 +858,7 @@ function decodeHtml(text) {
 
 
 /* =========================================================
-   РАНГИ DBD
+   DBD RANKS
 ========================================================= */
 
 function rankName(rank) {

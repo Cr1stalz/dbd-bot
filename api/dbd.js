@@ -1,12 +1,7 @@
 export default async function handler(req, res) {
-  res.setHeader(
-    "Content-Type",
-    "text/plain; charset=utf-8"
-  );
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
 
-  let input = String(
-    req.query?.steamid || ""
-  ).trim();
+  const input = cleanInput(req.query?.steamid);
 
   if (!input) {
     return res.status(200).send(
@@ -14,13 +9,7 @@ export default async function handler(req, res) {
     );
   }
 
-  input = cleanInput(input);
-
   try {
-    // ========================================================
-    // ПОЛУЧАЕМ STEAMID64
-    // ========================================================
-
     const steamId = await resolveSteamId(input);
 
     console.log("INPUT:", input);
@@ -32,24 +21,13 @@ export default async function handler(req, res) {
       );
     }
 
-    // ========================================================
-    // НИК + ЧАСЫ + DBD
-    // ========================================================
-
-    const [
-      nickname,
-      hours,
-      dbd
-    ] = await Promise.all([
+    const [nickname, hours, dbd] = await Promise.all([
       getSteamNickname(steamId),
       getSteamHours(steamId),
       getDbdStats(steamId)
     ]);
 
-    // ========================================================
-    // DBD ПРОФИЛЬ ЗАКРЫТ
-    // ========================================================
-
+    // Закрытая статистика DBD
     if (dbd?.private) {
       return res.status(200).send(
         `🎮 Статистика игрока [${nickname}] | ` +
@@ -58,60 +36,35 @@ export default async function handler(req, res) {
       );
     }
 
-    // ========================================================
-    // DBD НЕ ПОЛУЧЕН
-    // ========================================================
-
+    // Не удалось получить DBD
     if (!dbd) {
       return res.status(200).send(
         "❌ Не удалось получить статистику профиля"
       );
     }
 
-    // ========================================================
-    // РАНГИ
-    // ========================================================
+    const survivor = rankName(dbd.survivor_rank);
+    const killer = rankName(dbd.killer_rank);
 
-    const survivor =
-      rankName(dbd.survivor_rank);
+    const gens = toNumber(dbd.gensrepaired);
+    const escapes = toNumber(dbd.escaped);
 
-    const killer =
-      rankName(dbd.killer_rank);
-
-    // ========================================================
-    // СТАТИСТИКА
-    // ========================================================
-
-    const gens =
-      toNumber(dbd.gensrepaired);
-
-    const escapes =
-      toNumber(dbd.escaped);
-
-    const totalKills =
+    const kills =
       toNumber(dbd.sacrificed) +
       toNumber(dbd.killed);
 
-    // ========================================================
-    // ФИНАЛЬНЫЙ ВЫВОД
-    // ========================================================
-
-    const result =
+    return res.status(200).send(
       `🎮 Статистика игрока [${nickname}] | ` +
       `⏱ ${hours} | ` +
       `🧑 ${survivor} | ` +
       `🔪 ${killer} | ` +
       `🛠 Гены: ${gens} | ` +
       `🚪 Побеги: ${escapes} | ` +
-      `💀 Убито: ${totalKills}`;
-
-    return res.status(200).send(result);
+      `💀 Убито: ${kills}`
+    );
 
   } catch (error) {
-    console.error(
-      "Общая ошибка:",
-      error
-    );
+    console.error("API ERROR:", error);
 
     return res.status(200).send(
       "❌ Не удалось получить статистику профиля"
@@ -121,221 +74,119 @@ export default async function handler(req, res) {
 
 
 /* =========================================================
-   ОЧИСТКА INPUT
+   INPUT
 ========================================================= */
 
-function cleanInput(input) {
-  return String(input)
+function cleanInput(value) {
+  return String(value || "")
     .trim()
-    .replace(/^[\"']|[\"']$/g, "")
-    .replace(
-      /^https?:\/\//i,
-      "https://"
-    );
+    .replace(/^["']|["']$/g, "")
+    .replace(/^https?:\/\//i, "https://");
 }
 
 
 /* =========================================================
-   ПОЛУЧЕНИЕ STEAMID64
+   STEAM ID
 ========================================================= */
 
 async function resolveSteamId(input) {
-  let value = cleanInput(input);
-
-  // Прямой SteamID64
-  if (isSteamId(value)) {
-    return value;
+  if (isSteamId(input)) {
+    return input;
   }
 
-  // ========================================================
-  // STEAM URL
-  // ========================================================
+  let value = input;
 
+  // Steam URL
   if (/steamcommunity\.com/i.test(value)) {
     try {
       const url = new URL(value);
-
-      const parts =
-        url.pathname
-          .split("/")
-          .filter(Boolean);
+      const parts = url.pathname
+        .split("/")
+        .filter(Boolean);
 
       if (parts.length < 2) {
         return null;
       }
 
-      const type =
-        parts[0].toLowerCase();
-
+      const type = parts[0].toLowerCase();
       value = parts[1];
 
-      // /profiles/7656119...
       if (type === "profiles") {
-        return isSteamId(value)
-          ? value
-          : null;
+        return isSteamId(value) ? value : null;
       }
 
-      // /id/username
       if (type !== "id") {
         return null;
       }
 
-    } catch (error) {
-      console.error(
-        "Ошибка разбора Steam URL:",
-        error
-      );
-
+    } catch {
       return null;
     }
   }
 
-  const encoded =
-    encodeURIComponent(value);
+  const encoded = encodeURIComponent(value);
 
-  // ========================================================
-  // 1. STEAM XML — ТОЛЬКО ДЛЯ ПОИСКА STEAMID
-  // ========================================================
+  // Сначала XML
+  const xmlId = await fetchSteamId(
+    `https://steamcommunity.com/id/${encoded}/?xml=1`
+  );
 
-  try {
-    const response = await fetch(
-      `https://steamcommunity.com/id/${encoded}/?xml=1`,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0"
-        },
-
-        cache: "no-store"
-      }
-    );
-
-    console.log(
-      "STEAM XML STATUS:",
-      response.status
-    );
-
-    console.log(
-      "STEAM XML URL:",
-      response.url
-    );
-
-    // SteamID из URL после редиректа
-    const idFromUrl =
-      extractSteamId(response.url);
-
-    if (idFromUrl) {
-      return idFromUrl;
-    }
-
-    const body =
-      await response.text();
-
-    // SteamID из XML
-    const idFromBody =
-      extractSteamId(body);
-
-    if (idFromBody) {
-      return idFromBody;
-    }
-
-  } catch (error) {
-    console.error(
-      "Ошибка Steam XML:",
-      error
-    );
+  if (xmlId) {
+    return xmlId;
   }
 
-  // ========================================================
-  // 2. ОБЫЧНАЯ СТРАНИЦА STEAM
-  // ========================================================
-
-  try {
-    const response = await fetch(
-      `https://steamcommunity.com/id/${encoded}/`,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-
-          "Accept":
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        },
-
-        cache: "no-store"
-      }
-    );
-
-    console.log(
-      "STEAM HTML STATUS:",
-      response.status
-    );
-
-    console.log(
-      "STEAM HTML URL:",
-      response.url
-    );
-
-    // SteamID из URL после редиректа
-    const idFromUrl =
-      extractSteamId(response.url);
-
-    if (idFromUrl) {
-      return idFromUrl;
-    }
-
-    const html =
-      await response.text();
-
-    // SteamID из HTML
-    const idFromHtml =
-      extractSteamId(html);
-
-    if (idFromHtml) {
-      return idFromHtml;
-    }
-
-  } catch (error) {
-    console.error(
-      "Ошибка Steam HTML:",
-      error
-    );
-  }
-
-  return null;
-}
-
-
-/* =========================================================
-   ПОИСК STEAMID64
-========================================================= */
-
-function extractSteamId(text) {
-  if (!text) {
-    return null;
-  }
-
-  const match =
-    String(text).match(
-      /7656119\d{10}/
-    );
-
-  return match
-    ? match[0]
-    : null;
-}
-
-
-function isSteamId(value) {
-  return /^7656119\d{10}$/.test(
-    value
+  // Затем обычная страница
+  return fetchSteamId(
+    `https://steamcommunity.com/id/${encoded}/`
   );
 }
 
 
+async function fetchSteamId(url) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      },
+      cache: "no-store"
+    });
+
+    console.log("STEAM STATUS:", response.status);
+    console.log("STEAM URL:", response.url);
+
+    // После редиректа SteamID может быть прямо в URL
+    const urlId = extractSteamId(response.url);
+
+    if (urlId) {
+      return urlId;
+    }
+
+    const body = await response.text();
+
+    return extractSteamId(body);
+
+  } catch (error) {
+    console.error("Steam ID error:", error);
+    return null;
+  }
+}
+
+
+function extractSteamId(text) {
+  const match = String(text || "")
+    .match(/7656119\d{10}/);
+
+  return match ? match[0] : null;
+}
+
+
+function isSteamId(value) {
+  return /^7656119\d{10}$/.test(value);
+}
+
+
 /* =========================================================
-   НИК STEAM
+   NICKNAME
 ========================================================= */
 
 async function getSteamNickname(steamId) {
@@ -344,162 +195,110 @@ async function getSteamNickname(steamId) {
       `https://steamcommunity.com/profiles/${steamId}/`,
       {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36",
-
-          "Accept":
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+          "User-Agent": "Mozilla/5.0"
         },
-
         cache: "no-store"
       }
     );
 
-    console.log(
-      "NICK STATUS:",
-      response.status
-    );
+    console.log("NICK STATUS:", response.status);
 
     if (!response.ok) {
       return "Неизвестно";
     }
 
-    const html =
-      await response.text();
+    const html = await response.text();
 
-    // ======================================================
-    // 1. OG TITLE
-    // ======================================================
+    // og:title
+    let match = html.match(
+      /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i
+    );
 
-    let match =
-      html.match(
-        /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'][^>]*>/i
+    if (!match) {
+      match = html.match(
+        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i
       );
-
-    if (!match?.[1]) {
-      match =
-        html.match(
-          /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["'][^>]*>/i
-        );
     }
 
     if (match?.[1]) {
-      let nickname =
-        decodeHtml(
-          match[1].trim()
-        );
-
-      nickname =
-        nickname
-          .replace(
-            /^Steam Community\s*::\s*/i,
-            ""
-          )
-          .trim();
+      const nickname = cleanNickname(match[1]);
 
       if (nickname) {
         return nickname;
       }
     }
 
-    // ======================================================
-    // 2. STEAMID XML
-    // ======================================================
-
-    match =
-      html.match(
-        /<steamID>([\s\S]*?)<\/steamID>/i
-      );
+    // steamID
+    match = html.match(
+      /<steamID>([\s\S]*?)<\/steamID>/i
+    );
 
     if (match?.[1]) {
-      let nickname =
-        decodeHtml(
-          match[1].trim()
-        );
-
-      nickname =
-        nickname
-          .replace(
-            /^Steam Community\s*::\s*/i,
-            ""
-          )
-          .trim();
+      const nickname = cleanNickname(match[1]);
 
       if (nickname) {
         return nickname;
       }
     }
 
-    // ======================================================
-    // 3. TITLE
-    // ======================================================
-
-    match =
-      html.match(
-        /<title>([\s\S]*?)<\/title>/i
-      );
+    // title
+    match = html.match(
+      /<title>([\s\S]*?)<\/title>/i
+    );
 
     if (match?.[1]) {
-      let nickname =
-        decodeHtml(
-          match[1].trim()
-        );
-
-      nickname =
-        nickname
-          .replace(
-            /^Steam Community\s*::\s*/i,
-            ""
-          )
+      const nickname = cleanNickname(
+        match[1]
           .replace(
             /\s*::\s*Steam Community.*$/i,
             ""
           )
-          .trim();
+      );
 
       if (
         nickname &&
-        !/^Steam Community$/i.test(
-          nickname
-        )
+        !/^Steam Community$/i.test(nickname)
       ) {
         return nickname;
       }
     }
 
   } catch (error) {
-    console.error(
-      "Ошибка получения ника:",
-      error
-    );
+    console.error("Nickname error:", error);
   }
 
   return "Неизвестно";
 }
 
 
+function cleanNickname(value) {
+  return decodeHtml(value)
+    .replace(
+      /^Steam Community\s*::\s*/i,
+      ""
+    )
+    .trim();
+}
+
+
 /* =========================================================
-   ЧАСЫ — ТОЛЬКО DECAPI
+   HOURS — DECAPI
 ========================================================= */
 
 async function getSteamHours(steamId) {
   try {
     const response = await fetch(
-      `https://decapi.me/steam/hours/${encodeURIComponent(
-        steamId
-      )}/381210`,
+      `https://decapi.me/steam/hours/${steamId}/381210`,
       {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0"
+          "User-Agent": "Mozilla/5.0"
         },
-
         cache: "no-store"
       }
     );
 
     console.log(
-      "DECAPI HOURS STATUS:",
+      "DECAPI STATUS:",
       response.status
     );
 
@@ -512,24 +311,18 @@ async function getSteamHours(steamId) {
     ).trim();
 
     console.log(
-      "DECAPI HOURS RESPONSE:",
+      "DECAPI RESPONSE:",
       text
     );
 
-    // ======================================================
     // DecAPI должен вернуть только число
-    // ======================================================
-
-    if (
-      !/^\d+(?:[.,]\d+)?$/.test(text)
-    ) {
+    if (!/^\d+(?:[.,]\d+)?$/.test(text)) {
       return "Время игры скрыто";
     }
 
-    const hours =
-      parseFloat(
-        text.replace(",", ".")
-      );
+    const hours = Number(
+      text.replace(",", ".")
+    );
 
     if (
       !Number.isFinite(hours) ||
@@ -545,7 +338,7 @@ async function getSteamHours(steamId) {
 
   } catch (error) {
     console.error(
-      "Ошибка получения часов через DecAPI:",
+      "DecAPI hours error:",
       error
     );
 
@@ -555,274 +348,48 @@ async function getSteamHours(steamId) {
 
 
 /* =========================================================
-   DBD СТАТИСТИКА
+   DBD
 ========================================================= */
 
 async function getDbdStats(steamId) {
   const statsUrl =
-    `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
-      steamId
-    )}`;
+    `https://dbd.tricky.lol/api/playerstats?steamid=${steamId}`;
 
-  try {
-    // ======================================================
-    // 1. Обычный запрос playerstats
-    // ======================================================
+  // Первый запрос
+  const first = await fetchJson(statsUrl);
 
-    const response =
-      await fetch(
-        statsUrl,
-        {
-          method: "GET",
+  if (first) {
+    const result = parseDbdResponse(first);
 
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0",
-
-            "Accept":
-              "application/json"
-          },
-
-          cache: "no-store"
-        }
-      );
-
-    console.log(
-      "DBD STATS STATUS:",
-      response.status
-    );
-
-    if (response.ok) {
-      try {
-        const data =
-          await response.json();
-
-        console.log(
-          "DBD STATS DATA:",
-          data
-        );
-
-        // ==================================================
-        // ПРОФИЛЬ ЗАКРЫТ
-        // ==================================================
-
-        if (
-          data &&
-          Number(data.result) === 0
-        ) {
-          const message =
-            String(
-              data.message || ""
-            ).toLowerCase();
-
-          if (
-            message.includes("private") ||
-            message.includes(
-              "don't have any stats"
-            ) ||
-            message.includes("no stats")
-          ) {
-            return {
-              private: true
-            };
-          }
-
-          return null;
-        }
-
-        // ==================================================
-        // НОРМАЛЬНАЯ СТАТИСТИКА
-        // ==================================================
-
-        if (
-          data &&
-          typeof data === "object"
-        ) {
-          return data;
-        }
-
-      } catch (error) {
-        console.error(
-          "Ошибка JSON DBD:",
-          error
-        );
-      }
+    if (result) {
+      return result;
     }
+  }
 
-    // ======================================================
-    // 2. PROFILE REQUEST
-    // ======================================================
+  // Fallback profile
+  const profileUrl =
+    `https://dbd.tricky.lol/?json=profile&profile=${steamId}`;
 
-    const profileUrl =
-      `https://dbd.tricky.lol/?json=profile&profile=${encodeURIComponent(
-        steamId
-      )}`;
+  console.log(
+    "DBD PROFILE REQUEST:",
+    profileUrl
+  );
 
-    console.log(
-      "DBD PROFILE REQUEST:",
-      profileUrl
-    );
+  const profile = await fetchJson(profileUrl);
 
-    try {
-      const profileResponse =
-        await fetch(
-          profileUrl,
-          {
-            method: "GET",
+  if (profile) {
+    const result = parseDbdResponse(profile);
 
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0",
-
-              "Accept":
-                "application/json,text/plain,*/*",
-
-              "Referer":
-                "https://dbd.tricky.lol/"
-            },
-
-            cache: "no-store"
-          }
-        );
-
-      console.log(
-        "DBD PROFILE STATUS:",
-        profileResponse.status
-      );
-
-      const profileText =
-        await profileResponse.text();
-
-      console.log(
-        "DBD PROFILE RESPONSE:",
-        profileText
-      );
-
-      try {
-        const profileData =
-          JSON.parse(profileText);
-
-        if (
-          profileData &&
-          Number(profileData.result) === 0
-        ) {
-          const message =
-            String(
-              profileData.message || ""
-            ).toLowerCase();
-
-          if (
-            message.includes("private") ||
-            message.includes(
-              "don't have any stats"
-            ) ||
-            message.includes("no stats")
-          ) {
-            return {
-              private: true
-            };
-          }
-        }
-
-      } catch (error) {
-        console.error(
-          "DBD PROFILE JSON ERROR:",
-          error
-        );
-      }
-
-    } catch (error) {
-      console.error(
-        "Ошибка DBD profile:",
-        error
-      );
+    if (result) {
+      return result;
     }
+  }
 
-    // ======================================================
-    // 3. ПОВТОРНЫЙ playerstats
-    // ======================================================
+  // Повторный playerstats
+  const retry = await fetchJson(statsUrl);
 
-    try {
-      const retryResponse =
-        await fetch(
-          statsUrl,
-          {
-            method: "GET",
-
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0",
-
-              "Accept":
-                "application/json"
-            },
-
-            cache: "no-store"
-          }
-        );
-
-      console.log(
-        "DBD RETRY STATUS:",
-        retryResponse.status
-      );
-
-      if (retryResponse.ok) {
-        const data =
-          await retryResponse.json();
-
-        console.log(
-          "DBD RETRY DATA:",
-          data
-        );
-
-        // ==================================================
-        // ПРОФИЛЬ ЗАКРЫТ
-        // ==================================================
-
-        if (
-          data &&
-          Number(data.result) === 0
-        ) {
-          const message =
-            String(
-              data.message || ""
-            ).toLowerCase();
-
-          if (
-            message.includes("private") ||
-            message.includes(
-              "don't have any stats"
-            ) ||
-            message.includes("no stats")
-          ) {
-            return {
-              private: true
-            };
-          }
-
-          return null;
-        }
-
-        if (
-          data &&
-          typeof data === "object"
-        ) {
-          return data;
-        }
-      }
-
-    } catch (error) {
-      console.error(
-        "Ошибка повторного DBD:",
-        error
-      );
-    }
-
-  } catch (error) {
-    console.error(
-      "Ошибка DBD API:",
-      error
-    );
+  if (retry) {
+    return parseDbdResponse(retry);
   }
 
   return null;
@@ -830,12 +397,82 @@ async function getDbdStats(steamId) {
 
 
 /* =========================================================
-   ЧИСЛА
+   DBD JSON
+========================================================= */
+
+async function fetchJson(url) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json,text/plain,*/*"
+      },
+      cache: "no-store"
+    });
+
+    console.log(
+      "FETCH:",
+      url,
+      "STATUS:",
+      response.status
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error(
+      "Fetch JSON error:",
+      error
+    );
+
+    return null;
+  }
+}
+
+
+/* =========================================================
+   ОБРАБОТКА DBD RESPONSE
+========================================================= */
+
+function parseDbdResponse(data) {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  // Ошибка / закрытый профиль
+  if (Number(data.result) === 0) {
+    const message =
+      String(data.message || "")
+        .toLowerCase();
+
+    if (
+      message.includes("private") ||
+      message.includes("don't have any stats") ||
+      message.includes("no stats")
+    ) {
+      return {
+        private: true
+      };
+    }
+
+    return null;
+  }
+
+  // Нормальная статистика
+  return data;
+}
+
+
+/* =========================================================
+   NUMBERS
 ========================================================= */
 
 function toNumber(value) {
-  const number =
-    Number(value);
+  const number = Number(value);
 
   return Number.isFinite(number)
     ? number
@@ -844,48 +481,24 @@ function toNumber(value) {
 
 
 /* =========================================================
-   HTML / CDATA
+   HTML
 ========================================================= */
 
 function decodeHtml(text) {
-  return String(text)
-    .replace(
-      /^<!\[CDATA\[/,
-      ""
-    )
-    .replace(
-      /\]\]>$/,
-      ""
-    )
-    .replace(
-      /&amp;/g,
-      "&"
-    )
-    .replace(
-      /&lt;/g,
-      "<"
-    )
-    .replace(
-      /&gt;/g,
-      ">"
-    )
-    .replace(
-      /&quot;/g,
-      '"'
-    )
-    .replace(
-      /&#39;/g,
-      "'"
-    )
-    .replace(
-      /&#x27;/gi,
-      "'"
-    );
+  return String(text || "")
+    .replace(/^<!\[CDATA\[/, "")
+    .replace(/\]\]>$/, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'");
 }
 
 
 /* =========================================================
-   РАНГИ DBD
+   RANKS
 ========================================================= */
 
 function rankName(rank) {
@@ -916,8 +529,5 @@ function rankName(rank) {
     1: "Радужный I"
   };
 
-  return (
-    ranks[Number(rank)] ||
-    "Неизвестно"
-  );
+  return ranks[Number(rank)] || "Неизвестно";
 }

@@ -122,25 +122,79 @@ export default async function handler(req, res) {
       getStat("DBD_BloodwebMaxPrestigeLevel");
 
     // =========================
-    // ПИПСЫ → СТАРЫЙ РАНГ DBD
+    // ПИПСЫ → РАНГ DBD
     // =========================
 
-    /*
-      ВАЖНО:
+    function getRank(pips) {
+      if (pips < 21) {
+        return "Пепел IV";
+      }
 
-      DBD_KillerSkulls и DBD_CamperSkulls
-      являются количеством пипсов.
+      if (pips <= 22) {
+        return "Бронза IV";
+      }
 
-      Steam не хранит отдельным полем
-      современный текущий Grade.
+      if (pips <= 24) {
+        return "Бронза III";
+      }
 
-      Поэтому здесь НЕ делаем ложное
-      преобразование 21/28 в текущий Grade.
-    */
+      if (pips <= 26) {
+        return "Бронза II";
+      }
 
-    function pipInfo(pips) {
-      return `${pips} пип.`;
+      if (pips <= 28) {
+        return "Бронза I";
+      }
+
+      if (pips <= 33) {
+        return "Серебро IV";
+      }
+
+      if (pips <= 38) {
+        return "Серебро III";
+      }
+
+      if (pips <= 43) {
+        return "Серебро II";
+      }
+
+      if (pips <= 48) {
+        return "Серебро I";
+      }
+
+      if (pips <= 53) {
+        return "Золото IV";
+      }
+
+      if (pips <= 58) {
+        return "Золото III";
+      }
+
+      if (pips <= 63) {
+        return "Золото II";
+      }
+
+      if (pips <= 68) {
+        return "Золото I";
+      }
+
+      if (pips <= 73) {
+        return "Радужный IV";
+      }
+
+      if (pips <= 78) {
+        return "Радужный III";
+      }
+
+      if (pips <= 83) {
+        return "Радужный II";
+      }
+
+      return "Радужный I";
     }
+
+    const killerRank = getRank(killerPips);
+    const survivorRank = getRank(survivorPips);
 
     // =========================
     // ОТВЕТ
@@ -149,10 +203,9 @@ export default async function handler(req, res) {
     const message =
       `👤 ${nickname}` +
       ` | ⏱ ${playtime}` +
-      ` | 🔪 ${pipInfo(killerPips)}` +
-      ` | 🧑 ${pipInfo(survivorPips)}` +
-      ` | ☠️ Убито: ${killed}` +
-      ` | 🪝 Жертв: ${sacrificed}` +
+      ` | 🔪 ${killerRank}` +
+      ` | 🧑 ${survivorRank}` +
+      ` | ☠️ Убийства/жертвы: ${killed}/${sacrificed}` +
       ` | ⚙️ Генераторов: ${generators.toFixed(1)}` +
       ` | 🩸 Макс. престиж: ${maxPrestige}`;
 

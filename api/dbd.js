@@ -97,7 +97,7 @@ export default async function handler(req, res) {
     }
 
     // ==============================
-    // Получаем steamid из URL
+    // Получаем steamid
     // ==============================
     let input = req.query?.steamid;
 
@@ -169,6 +169,7 @@ export default async function handler(req, res) {
 
     const profileResponse = await fetch(profileUrl);
 
+    // Именно профиль недоступен
     if (!profileResponse.ok) {
       res.status(200).send("❌ Профиль скрыт");
       return;
@@ -230,8 +231,13 @@ export default async function handler(req, res) {
 
     const statsResponse = await fetch(statsUrl);
 
+    /*
+      Если Steam профиль существует,
+      но статистика DBD недоступна,
+      пишем именно "Список игр скрыт".
+    */
     if (!statsResponse.ok) {
-      res.status(200).send("❌ Профиль скрыт");
+      res.status(200).send("❌ Список игр скрыт");
       return;
     }
 
@@ -240,21 +246,22 @@ export default async function handler(req, res) {
     try {
       statsData = await statsResponse.json();
     } catch (error) {
-      res.status(200).send("❌ Профиль скрыт");
+      res.status(200).send("❌ Список игр скрыт");
       return;
     }
 
+    // Steam может вернуть {}
     if (
       !statsData ||
       !statsData.playerstats ||
       !Array.isArray(statsData.playerstats.stats)
     ) {
-      res.status(200).send("❌ Профиль скрыт");
+      res.status(200).send("❌ Список игр скрыт");
       return;
     }
 
     // ==============================
-    // Превращаем статистику в объект
+    // Превращаем Steam stats в объект
     // ==============================
     const stats = {};
 
@@ -326,7 +333,7 @@ export default async function handler(req, res) {
         : `⏱ Время игры скрыто`;
 
     // ==============================
-    // Итоговый порядок информации
+    // Итог
     // ==============================
     const result =
       `👤 ${nickname}` +
@@ -347,7 +354,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error(error);
 
-    // Всегда HTTP 200, чтобы Moobot не выдавал Data tag failure
     res.status(200).send("❌ Профиль скрыт");
   }
 }

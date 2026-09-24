@@ -13,10 +13,7 @@ export default async function handler(req, res) {
     );
   }
 
-  // ========================================
-  // Исправляем Https:// / HTTP:// -> https://
-  // ========================================
-
+  // Исправляем HTTP / Https / HTTPS и т.д.
   rawInput = rawInput.replace(/^https?:\/\//i, "https://");
 
   try {
@@ -33,7 +30,7 @@ export default async function handler(req, res) {
     }
 
     // ========================================
-    // 2. Получаем отображаемый ник из Steam
+    // 2. Получаем отображаемый ник Steam
     // ========================================
 
     let steamNickname = "Неизвестно";
@@ -50,9 +47,6 @@ export default async function handler(req, res) {
 
       if (profileResponse.ok) {
         const profileXml = await profileResponse.text();
-
-        // Steam может вернуть:
-        // <steamID><![CDATA[Cr1stalz_]]></steamID>
 
         const nicknameMatch = profileXml.match(
           /<steamID>([\s\S]*?)<\/steamID>/
@@ -118,27 +112,20 @@ export default async function handler(req, res) {
     // 4. Получаем статистику DBD
     // ========================================
 
-    const dbdResponse = await fetch(
-      `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
-        resolvedSteamId
-      )}`,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-          "Accept": "application/json"
-        }
-      }
+    let dbdResponse = await getDbdStats(
+      resolvedSteamId
     );
 
     // ========================================
-    // 5. Если профиль не найден (404)
+    // 5. Если профиля нет в базе
     // ========================================
 
     if (dbdResponse.status === 404) {
       console.log(
-        `Профиль ${resolvedSteamId} не найден. Отправляем запрос на добавление.`
+        `Профиль ${resolvedSteamId} не найден. Запускаем добавление.`
       );
 
+      // Отправляем запрос на добавление профиля
       try {
         const addProfileResponse = await fetch(
           `https://dbd.tricky.lol/?json=profile&profile=${encodeURIComponent(
@@ -155,49 +142,56 @@ export default async function handler(req, res) {
         );
 
         console.log(
-          `Запрос добавления профиля ${resolvedSteamId}: HTTP ${addProfileResponse.status}`
+          `Добавление профиля ${resolvedSteamId}: HTTP ${addProfileResponse.status}`
         );
 
         // ========================================
-        // Профиль отправлен на добавление
+        // 6. Ждём немного и проверяем снова
         // ========================================
 
-        if (
-          addProfileResponse.ok ||
-          addProfileResponse.status === 200
-        ) {
-          return res.status(200).send(
-            "⏳ Профиль добавляется в базу DBD Tricky. " +
-            "Подождите около 5 минут и повторите команду."
+        for (let attempt = 1; attempt <= 5; attempt++) {
+          console.log(
+            `Проверка DBD stats ${attempt}/5 для ${resolvedSteamId}`
           );
+
+          // Ждём 2 секунды
+          await sleep(2000);
+
+          dbdResponse = await getDbdStats(
+            resolvedSteamId
+          );
+
+          console.log(
+            `Проверка ${attempt}: HTTP ${dbdResponse.status}`
+          );
+
+          if (dbdResponse.ok) {
+            console.log(
+              `Статистика ${resolvedSteamId} успешно получена`
+            );
+            break;
+          }
         }
-
-        // ========================================
-        // Если сайт ответил ошибкой
-        // ========================================
-
-        return res.status(200).send(
-          "⏳ Профиль ещё не найден в базе DBD Tricky. " +
-          "Подождите около 5 минут и повторите команду."
-        );
-
       } catch (error) {
         console.error(
-          "Ошибка добавления профиля в DBD Tricky:",
+          "Ошибка добавления профиля:",
           error
-        );
-
-        return res.status(200).send(
-          "⏳ Профиль ещё не найден в базе DBD Tricky. " +
-          "Подождите около 5 минут и повторите команду."
         );
       }
     }
 
     // ========================================
-    // Другие ошибки DBD API
+    // 7. Если после попыток статистики всё ещё нет
     // ========================================
 
+    if (dbdResponse.status === 404) {
+      return res.status(200).send(
+        "⏳ Профиль добавляется в базу DBD Tricky. " +
+        "Подождите около 5 минут и повторите команду."
+      );
+    }
+
+    // Другие ошибки DBD API
     if (!dbdResponse.ok) {
       return res.status(200).send(
         "❌ Не удалось получить статистику профиля"
@@ -205,7 +199,7 @@ export default async function handler(req, res) {
     }
 
     // ========================================
-    // 6. Читаем JSON
+    // 8. Обрабатываем JSON
     // ========================================
 
     const data = await dbdResponse.json();
@@ -217,7 +211,7 @@ export default async function handler(req, res) {
     }
 
     // ========================================
-    // 7. Ранги
+    // 9. Ранги
     // ========================================
 
     const survivor = rankName(
@@ -229,7 +223,7 @@ export default async function handler(req, res) {
     );
 
     // ========================================
-    // 8. Статистика
+    // 10. Статистика
     // ========================================
 
     const gens =
@@ -243,7 +237,7 @@ export default async function handler(req, res) {
       (Number(data.killed) || 0);
 
     // ========================================
-    // 9. Часы
+    // 11. Часы
     // ========================================
 
     const hoursText =
@@ -252,7 +246,7 @@ export default async function handler(req, res) {
         : `${steamHours} ч`;
 
     // ========================================
-    // 10. Итог
+    // 12. Итоговый ответ
     // ========================================
 
     const result =
@@ -280,6 +274,36 @@ export default async function handler(req, res) {
 
 
 // ========================================
+// Получение статистики DBD
+// ========================================
+
+async function getDbdStats(steamId) {
+  return await fetch(
+    `https://dbd.tricky.lol/api/playerstats?steamid=${encodeURIComponent(
+      steamId
+    )}`,
+    {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
+      }
+    }
+  );
+}
+
+
+// ========================================
+// Задержка
+// ========================================
+
+function sleep(ms) {
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
+}
+
+
+// ========================================
 // Определение SteamID64
 // ========================================
 
@@ -292,14 +316,14 @@ async function resolveSteamId(input) {
     ""
   );
 
-  // Исправляем регистр HTTPS
+  // Нормализуем протокол
   cleaned = cleaned.replace(
     /^https?:\/\//i,
     "https://"
   );
 
   // ========================================
-  // Если это Steam-ссылка
+  // Если передана ссылка Steam
   // ========================================
 
   if (
@@ -321,7 +345,7 @@ async function resolveSteamId(input) {
       const type = parts[0];
       const value = parts[1];
 
-      // /profiles/76561198134964248/
+      // Прямая ссылка /profiles/765...
       if (
         type === "profiles" &&
         /^\d{17}$/.test(value)
@@ -329,7 +353,7 @@ async function resolveSteamId(input) {
         return value;
       }
 
-      // /id/cr1stalz_kz/
+      // Пользовательская ссылка /id/username
       if (type === "id") {
         cleaned = value;
       } else {
@@ -342,7 +366,7 @@ async function resolveSteamId(input) {
   }
 
   // ========================================
-  // Если уже передан SteamID64
+  // Если сразу передан SteamID64
   // ========================================
 
   if (/^\d{17}$/.test(cleaned)) {
@@ -350,7 +374,7 @@ async function resolveSteamId(input) {
   }
 
   // ========================================
-  // Определяем SteamID через Steam
+  // Если передан username
   // ========================================
 
   try {
@@ -370,10 +394,7 @@ async function resolveSteamId(input) {
       }
     );
 
-    // ========================================
-    // Проверяем редирект
-    // ========================================
-
+    // Steam может сразу вернуть редирект
     const location =
       response.headers.get("location");
 
@@ -388,10 +409,7 @@ async function resolveSteamId(input) {
       }
     }
 
-    // ========================================
-    // Пробуем Steam XML
-    // ========================================
-
+    // Пробуем XML
     const xmlResponse = await fetch(
       `https://steamcommunity.com/id/${encodeURIComponent(
         cleaned
@@ -407,7 +425,6 @@ async function resolveSteamId(input) {
       const xml =
         await xmlResponse.text();
 
-      // Ищем SteamID64
       let match = xml.match(
         /<steamID64>(\d{17})<\/steamID64>/
       );
@@ -416,7 +433,6 @@ async function resolveSteamId(input) {
         return match[1];
       }
 
-      // Дополнительный поиск SteamID64
       match = xml.match(
         /7656119\d{10}/
       );
@@ -443,11 +459,8 @@ async function resolveSteamId(input) {
 
 function decodeHtml(text) {
   return text
-    // Убираем CDATA
     .replace(/^<!\[CDATA\[/, "")
     .replace(/\]\]>$/, "")
-
-    // HTML-сущности
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

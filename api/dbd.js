@@ -369,7 +369,7 @@ export default async function handler(req, res) {
       ` | 🏃 Побеги: ${escapes}` +
       ` | ⭐ Макс. престиж: ${maxPrestige}` +
       ` | ⚙️ Генераторов: ${generators}` +
-      ` | 🩸 Очки крови: ${formatNumber(bloodpoints)}`;
+      ` | 🩸 Очки крови (всего): ${formatNumber(bloodpoints)}`;
 
     // ==============================
     // Ответ для Moobot

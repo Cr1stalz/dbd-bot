@@ -441,8 +441,7 @@ async function getSteamHours(steamId) {
         url,
         {
           headers: {
-            "User-Agent":
-              "Mozilla/5.0"
+            "User-Agent": "Mozilla/5.0"
           }
         }
       );
@@ -456,29 +455,30 @@ async function getSteamHours(steamId) {
       return "Время игры скрыто";
     }
 
-    const text =
-      (
-        await response.text()
-      ).trim();
+    const text = (
+      await response.text()
+    ).trim();
 
     console.log(
-      "DECAPI RESPONSE:",
+      "DECAPI HOURS RESPONSE:",
       text
     );
 
-    // DecAPI должен вернуть число
-    if (
-      !/^\d+(?:[.,]\d+)?$/.test(
-        text
-      )
-    ) {
+    // Ищем число в ответе DecAPI:
+    // 746.53 hours
+    // 746.53
+    // 746,53 hours
+    const match = text.match(
+      /(\d+(?:[.,]\d+)?)/
+    );
+
+    if (!match) {
       return "Время игры скрыто";
     }
 
-    const hours =
-      Number(
-        text.replace(",", ".")
-      );
+    const hours = Number(
+      match[1].replace(",", ".")
+    );
 
     if (
       !Number.isFinite(hours) ||

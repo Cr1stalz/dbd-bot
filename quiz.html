@@ -1,0 +1,88 @@
+```html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DBD Quiz</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:transparent;font-family:Arial,sans-serif;color:white}
+body{display:flex;align-items:center;justify-content:center}
+.card{width:440px;padding:24px;text-align:center;border-radius:22px;
+background:linear-gradient(145deg,rgba(25,17,24,.97),rgba(12,12,17,.96));
+border:1px solid rgba(210,40,55,.8);box-shadow:0 0 35px #0008}
+h1{font-size:25px;margin:0 0 7px;color:#ff4757}
+.sub{font-size:15px;color:#c7c7ce;margin-bottom:18px}
+.icon{width:170px;height:170px;object-fit:contain;border-radius:14px;
+background:#17151a;box-shadow:0 0 20px #0008}
+.name{font-size:25px;font-weight:bold;margin-top:16px}
+.status{font-size:17px;margin-top:12px;color:#f5d36a}
+.timer{font-size:30px;font-weight:bold;margin-top:10px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div id="card" class="card hidden">
+  <h1>УГАДАЙ ПЕРК</h1>
+  <div class="sub">Напиши название в чат!</div>
+  <img id="icon" class="icon" alt="Иконка перка">
+  <div id="name" class="name hidden"></div>
+  <div id="status" class="status">Ждём правильный ответ...</div>
+  <div id="timer" class="timer">20</div>
+</div>
+<script>
+const p = new URLSearchParams(location.search);
+const active = p.get("active") === "1";
+const revealed = p.get("reveal") === "1";
+const perk = p.get("perk") || "";
+const winner = p.get("winner") || "";
+const end = Number(p.get("end") || 0);
+
+const card = document.getElementById("card");
+const icon = document.getElementById("icon");
+const name = document.getElementById("name");
+const status = document.getElementById("status");
+const timer = document.getElementById("timer");
+
+if (active) {
+  card.classList.remove("hidden");
+
+  if (revealed) {
+    name.textContent = perk;
+    name.classList.remove("hidden");
+    status.textContent = winner
+      ? "🏆 Угадал: " + winner
+      : "Время вышло! Ответ раскрыт";
+    timer.textContent = "✓";
+  } else {
+    timer.textContent = "20";
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      timer.textContent = left;
+      if (left > 0) setTimeout(tick, 200);
+    };
+    tick();
+  }
+
+  // Изображение загружается из открытого набора DBD.
+  fetch("https://raw.githubusercontent.com/DanteASC4/dbd-assets-simple/main/killer_perks.json")
+    .then(r => {
+      if (!r.ok) throw new Error("Не удалось загрузить набор иконок");
+      return r.json();
+    })
+    .then(data => {
+      const entry = Object.entries(data).find(
+        ([key]) => key.toLowerCase() === perk.toLowerCase()
+      );
+      if (entry && entry[1].url) icon.src = entry[1].url;
+      else status.textContent = "Не найдена иконка для: " + perk;
+    })
+    .catch(() => {
+      status.textContent = "Не удалось загрузить иконку перка";
+    });
+}
+</script>
+</body>
+</html>
+```

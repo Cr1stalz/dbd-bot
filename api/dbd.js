@@ -240,7 +240,7 @@ export default async function handler(req, res) {
     const playtimeText =
       playtimeHours !== null
         ? `⏱ ${playtimeHours.toFixed(1)} ч`
-        : `⏱ Время игры скрыто (открой: ${STEAM_HELP_URL})`;
+        : `⏱ Время игры скрыто`;
 
     // ==============================
     // Получаем статистику DBD

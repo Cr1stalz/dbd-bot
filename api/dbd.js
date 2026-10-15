@@ -1,5 +1,6 @@
 export default async function handler(req, res) {
   const API_KEY = process.env.STEAM_API_KEY;
+  const STEAM_HELP_URL = "https://dbd-bot-livid.vercel.app/steam-help.html";
 
   // ==============================
   // Форматирование больших чисел
@@ -30,6 +31,8 @@ export default async function handler(req, res) {
   // ==============================
   function getGrade(pips) {
     pips = Number(pips) || 0;
+
+    if (pips < 0) pips = 0;
 
     if (pips <= 2) return "Пепел IV";
     if (pips <= 5) return "Пепел III";
@@ -66,7 +69,7 @@ export default async function handler(req, res) {
 
     input = decodeURIComponent(input.trim());
 
-    // Прямой SteamID64
+    // Просто SteamID64
     if (/^\d{17}$/.test(input)) {
       return input;
     }
@@ -88,9 +91,8 @@ export default async function handler(req, res) {
     // Проверяем API ключ
     // ==============================
     if (!API_KEY) {
-      return res.status(200).send(
-        "❌ STEAM_API_KEY не задан"
-      );
+      res.status(200).send("❌ STEAM_API_KEY не задан");
+      return;
     }
 
     // ==============================
@@ -103,9 +105,8 @@ export default async function handler(req, res) {
     }
 
     if (!input) {
-      return res.status(200).send(
-        "❌ Укажи Steam профиль"
-      );
+      res.status(200).send("❌ Укажи Steam профиль");
+      return;
     }
 
     // ==============================
@@ -130,37 +131,31 @@ export default async function handler(req, res) {
           `?key=${encodeURIComponent(API_KEY)}` +
           `&vanityurl=${encodeURIComponent(vanity)}`;
 
-        const resolveResponse =
-          await fetch(resolveUrl);
+        const resolveResponse = await fetch(resolveUrl);
 
         if (!resolveResponse.ok) {
-          return res.status(200).send(
-            "❌ Профиль скрыт"
-          );
+          res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+          return;
         }
 
-        const resolveData =
-          await resolveResponse.json();
+        const resolveData = await resolveResponse.json();
 
         if (
           !resolveData.response ||
           resolveData.response.success !== 1 ||
           !resolveData.response.steamid
         ) {
-          return res.status(200).send(
-            "❌ Профиль скрыт"
-          );
+          res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+          return;
         }
 
-        steamId =
-          resolveData.response.steamid;
+        steamId = resolveData.response.steamid;
       }
     }
 
     if (!steamId) {
-      return res.status(200).send(
-        "❌ Неверная ссылка Steam"
-      );
+      res.status(200).send(`❌ Неверная ссылка Steam. Используй SteamID64 или ссылку /profiles/ID либо /id/имя. Инструкция: ${STEAM_HELP_URL}`);
+      return;
     }
 
     // ==============================
@@ -171,32 +166,42 @@ export default async function handler(req, res) {
       `?key=${encodeURIComponent(API_KEY)}` +
       `&steamids=${encodeURIComponent(steamId)}`;
 
-    const profileResponse =
-      await fetch(profileUrl);
+    const profileResponse = await fetch(profileUrl);
 
     if (!profileResponse.ok) {
-      return res.status(200).send(
-        "❌ Профиль скрыт"
-      );
+      res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+      return;
     }
 
-    const profileData =
-      await profileResponse.json();
+    let profileData;
 
-    const player =
-      profileData?.response?.players?.[0];
+    try {
+      profileData = await profileResponse.json();
+    } catch (error) {
+      res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+      return;
+    }
+
+    const player = profileData?.response?.players?.[0];
 
     if (!player) {
-      return res.status(200).send(
-        "❌ Профиль скрыт"
-      );
+      res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+      return;
     }
 
-    const nickname =
-      player.personaname || "Неизвестно";
+    const nickname = player.personaname || "Неизвестно";
 
     // ==============================
     // Получаем время игры DBD
+    //
+    // ВАЖНО:
+    // Dead by Daylight — бесплатная игра.
+    // Steam GetOwnedGames по умолчанию
+    // не возвращает бесплатные игры.
+    //
+    // Поэтому обязательно:
+    // include_played_free_games=1
+    // и сразу фильтруем AppID 381210.
     // ==============================
     let playtimeHours = null;
 
@@ -206,46 +211,36 @@ export default async function handler(req, res) {
         `?key=${encodeURIComponent(API_KEY)}` +
         `&steamid=${encodeURIComponent(steamId)}` +
         `&format=json` +
-        `&include_appinfo=1`;
+        `&include_played_free_games=1` +
+        `&include_appinfo=0` +
+        `&appids_filter[0]=381210`;
 
-      const gamesResponse =
-        await fetch(gamesUrl);
+      const gamesResponse = await fetch(gamesUrl);
 
       if (gamesResponse.ok) {
-        const gamesData =
-          await gamesResponse.json();
+        const gamesData = await gamesResponse.json();
 
-        const games =
-          gamesData?.response?.games;
+        const dbdGame =
+          gamesData?.response?.games?.find(
+            game => Number(game.appid) === 381210
+          );
 
-        if (Array.isArray(games)) {
-          const dbdGame =
-            games.find(
-              game => Number(game.appid) === 381210
-            );
-
-          // Любое значение больше 0 минут показываем
-          if (
-            dbdGame &&
-            typeof dbdGame.playtime_forever === "number" &&
-            dbdGame.playtime_forever > 0
-          ) {
-            playtimeHours =
-              dbdGame.playtime_forever / 60;
-          }
+        if (
+          dbdGame &&
+          typeof dbdGame.playtime_forever === "number"
+        ) {
+          playtimeHours =
+            dbdGame.playtime_forever / 60;
         }
       }
     } catch (error) {
-      console.error(
-        "PLAYTIME ERROR:",
-        error
-      );
+      playtimeHours = null;
     }
 
     const playtimeText =
       playtimeHours !== null
         ? `⏱ ${playtimeHours.toFixed(1)} ч`
-        : `⏱ Время игры скрыто`;
+        : `⏱ Время игры скрыто (открой: ${STEAM_HELP_URL})`;
 
     // ==============================
     // Получаем статистику DBD
@@ -259,58 +254,50 @@ export default async function handler(req, res) {
     let statsResponse;
 
     try {
-      statsResponse =
-        await fetch(statsUrl);
+      statsResponse = await fetch(statsUrl);
     } catch (error) {
-      console.error(
-        "STATS ERROR:",
-        error
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
       );
-
-      return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
-      );
+      return;
     }
 
     if (!statsResponse.ok) {
-      return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
       );
+      return;
     }
 
     let statsData;
 
     try {
-      statsData =
-        await statsResponse.json();
+      statsData = await statsResponse.json();
     } catch (error) {
-      return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
       );
+      return;
     }
 
     if (
       !statsData ||
       !statsData.playerstats ||
-      !Array.isArray(
-        statsData.playerstats.stats
-      )
+      !Array.isArray(statsData.playerstats.stats)
     ) {
-      return res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Игры скрыты`
+      res.status(200).send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
       );
+      return;
     }
 
     // ==============================
-    // Преобразуем Steam stats в объект
+    // Превращаем Steam stats в объект
     // ==============================
     const stats = {};
 
-    for (
-      const item of statsData.playerstats.stats
-    ) {
-      stats[item.name] =
-        Number(item.value) || 0;
+    for (const item of statsData.playerstats.stats) {
+      stats[item.name] = Number(item.value) || 0;
     }
 
     // ==============================
@@ -338,8 +325,7 @@ export default async function handler(req, res) {
       stats.DBD_SacrificedCampers || 0;
 
     const totalKills =
-      killedCampers +
-      sacrificedCampers;
+      killedCampers + sacrificedCampers;
 
     // ==============================
     // Генераторы
@@ -353,11 +339,11 @@ export default async function handler(req, res) {
     // Максимальный престиж
     // ==============================
     const maxPrestige =
-      stats.DBD_BloodwebMaxPrestigeLevel ||
-      0;
+      stats.DBD_BloodwebMaxPrestigeLevel || 0;
 
     // ==============================
     // Побеги
+    // Обычный выход + люк
     // ==============================
     const escapes =
       (stats.DBD_Escape || 0) +
@@ -383,31 +369,11 @@ export default async function handler(req, res) {
       ` | ⚙️ Генераторов: ${generators}` +
       ` | 🩸 Очки крови (всего): ${formatNumber(bloodpoints)}`;
 
-    // ==============================
-    // Заголовки ответа
-    // ==============================
-    res.setHeader(
-      "Cache-Control",
-      "s-maxage=60, stale-while-revalidate=300"
-    );
-
-    res.setHeader(
-      "Content-Type",
-      "text/plain; charset=utf-8"
-    );
-
-    return res
-      .status(200)
-      .send(result);
+    res.status(200).send(result);
 
   } catch (error) {
-    console.error(
-      "DBD API ERROR:",
-      error
-    );
+    console.error(error);
 
-    return res.status(200).send(
-      "❌ Профиль скрыт"
-    );
+    res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
   }
 }

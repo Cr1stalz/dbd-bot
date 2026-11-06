@@ -114,8 +114,8 @@ body.transparent .tile{background:rgba(0,0,0,.28)}
       );
     }
 
-    addTile("killer", "🔪 Убийца", esc(d.killer.grade), d.killer.pips + " пипсов");
-    addTile("survivor", "🧑 Выживший", esc(d.survivor.grade), d.survivor.pips + " пипсов");
+    addTile("killer", "🔪 Убийца", esc(d.killer.grade));
+    addTile("survivor", "🧑 Выживший", esc(d.survivor.grade));
     addTile("kills", "☠️ Убийства", nf.format(d.kills.total));
     addTile("escapes", "🏃 Побеги", nf.format(d.escapes.total));
     addTile("prestige", "⭐ Престиж", nf.format(d.maxPrestige));

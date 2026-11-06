@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   const MSG_NO_KEY = "❌ STEAM_API_KEY не задан";
   const MSG_NO_INPUT = "❌ Укажи Steam профиль";
   const MSG_NOT_FOUND = `❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`;
-  const MSG_INVALID = `❌ Неверная ссылка Steam. Используй SteamID64 или ссылку /profiles/ID либо /id/имя. Инструкция: ${STEAM_HELP_URL}`;
+  const MSG_INVALID = `❌ Неверная ссылка Steam. Используй SteamID64, ссылку /profiles/ID, /id/имя или просто имя профиля. Инструкция: ${STEAM_HELP_URL}`;
   const MSG_INTERNAL = `❌ Внутренняя ошибка. Попробуй позже: ${STEAM_HELP_URL}`;
 
   // ==============================
@@ -152,18 +152,26 @@ export default async function handler(req, res) {
     let steamId = extractSteamId(input);
     let attemptedVanity = false;
 
-    // Vanity URL — /id/username
+    // Vanity: полный URL /id/имя или просто имя кастомного URL (например cr1stalz_kz)
     if (!steamId) {
+      let vanity = null;
+
       const vanityMatch = input.match(
         /steamcommunity\.com\/id\/([^\/?#]+)/i
       );
 
       if (vanityMatch) {
+        vanity = vanityMatch[1];
+      } else if (/^[a-zA-Z0-9_-]{2,32}$/.test(input)) {
+        vanity = input;
+      }
+
+      if (vanity) {
         attemptedVanity = true;
 
         const resolve = await fetchSteam(
           "ISteamUser/ResolveVanityURL/v0001",
-          { vanityurl: vanityMatch[1] }
+          { vanityurl: vanity }
         );
 
         if (

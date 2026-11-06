@@ -24,25 +24,22 @@ body{
 }
 body.transparent{background:transparent}
 .card{
-  width:min(360px,100%);
+  width:min(430px,100%);
   background:var(--panel);border:1px solid var(--border);
-  border-radius:13px;padding:14px;
+  border-radius:14px;padding:18px;
 }
-body.small .card{zoom:.72}
-body.large .card{zoom:1.2}
 body.transparent .card{background:transparent;border:none;text-shadow:0 1px 3px rgba(0,0,0,.85)}
-.header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
-.nick{font-size:17px;font-weight:800;letter-spacing:-0.2px;color:var(--accent)}
+.header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px}
+.nick{font-size:20px;font-weight:800;letter-spacing:-0.2px;color:var(--accent)}
 .nick a{color:inherit;text-decoration:none}
-.updated{font-size:10px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.tile{background:rgba(0,0,0,.18);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
-.tile.wide{grid-column:1 / -1}
+.updated{font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:rgba(0,0,0,.18);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
 body.transparent .tile{background:rgba(0,0,0,.28)}
-.tile .label{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
-.tile .value{font-size:16px;font-weight:800;letter-spacing:-0.2px;font-variant-numeric:tabular-nums}
-.tile .sub{font-size:10px;font-weight:500;color:var(--muted);margin-top:1px}
-.playtime{grid-column:1 / -1;text-align:center;font-size:12px;font-weight:500;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.tile .label{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.tile .value{font-size:20px;font-weight:800;letter-spacing:-0.3px;font-variant-numeric:tabular-nums}
+.tile .sub{font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
+.playtime{grid-column:1 / -1;text-align:center;font-size:13px;font-weight:500;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
 .msg{text-align:center;color:var(--muted);padding:20px}
 .msg .err{color:#ff9f9f;font-size:16px;font-weight:600;margin-bottom:10px}
 .msg a{color:var(--accent)}
@@ -63,9 +60,6 @@ body.transparent .tile{background:rgba(0,0,0,.28)}
   var refresh = Math.max(10, parseInt(params.get("refresh") || "60", 10));
   var accent = params.get("accent") || "#66c0f4";
   var hidden = new Set((params.get("hide") || "").split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean));
-  var size = (params.get("size") || "").toLowerCase();
-  if (size === "small") document.body.classList.add("small");
-  else if (size === "large") document.body.classList.add("large");
 
   if (params.get("transparent") === "1") document.body.classList.add("transparent");
   document.documentElement.style.setProperty("--accent", accent);
@@ -112,10 +106,10 @@ body.transparent .tile{background:rgba(0,0,0,.28)}
     }
 
     var tiles = [];
-    function addTile(key, label, value, sub, wide) {
+    function addTile(key, label, value, sub) {
       if (hidden.has(key)) return;
       tiles.push(
-        '<div class="tile' + (wide ? " wide" : "") + '"><div class="label">' + label + '</div><div class="value">' + value + "</div>" +
+        '<div class="tile"><div class="label">' + label + '</div><div class="value">' + value + "</div>" +
         (sub ? '<div class="sub">' + sub + "</div>" : "") + "</div>"
       );
     }
@@ -126,7 +120,7 @@ body.transparent .tile{background:rgba(0,0,0,.28)}
     addTile("escapes", "🏃 Побеги", nf.format(d.escapes.total));
     addTile("prestige", "⭐ Престиж", nf.format(d.maxPrestige));
     addTile("generators", "⚙️ Генераторов", nf.format(d.generators));
-    addTile("bloodpoints", "🩸 Очки крови", compact.format(d.bloodpoints), null, true);
+    addTile("bloodpoints", "🩸 Очки крови", compact.format(d.bloodpoints));
 
     var playtime = d.playtime.hidden ? "скрыто" : d.playtime.hours.toFixed(1) + " ч";
 

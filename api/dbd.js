@@ -1,10 +1,21 @@
 export default async function handler(req, res) {
   const API_KEY = process.env.STEAM_API_KEY;
   const STEAM_HELP_URL = "https://dbd-bot-livid.vercel.app/steam-help.html";
+  const DBD_APP_ID = 381210;
+  const TIMEOUT_MS = 8000; // лимит на каждый запрос к Steam
+  const CACHE_TTL = 30;    // кэш CDN в секундах (поставь 0, чтобы отключить)
 
   // ==============================
-  // Форматирование больших чисел
+  // Утилиты
   // ==============================
+  const send = (text) => res.status(200).send(text);
+
+  const notFound = () =>
+    send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+
+  const invalidInput = () =>
+    send(`❌ Неверная ссылка Steam. Используй SteamID64 или ссылку /profiles/ID либо /id/имя. Инструкция: ${STEAM_HELP_URL}`);
+
   function formatNumber(num) {
     num = Number(num) || 0;
 
@@ -26,9 +37,6 @@ export default async function handler(req, res) {
     return String(Math.round(num));
   }
 
-  // ==============================
-  // Определение Grade
-  // ==============================
   function getGrade(pips) {
     pips = Number(pips) || 0;
 
@@ -61,13 +69,18 @@ export default async function handler(req, res) {
     return "Радужный I";
   }
 
-  // ==============================
-  // Извлечение SteamID64
-  // ==============================
+  function safeDecode(str) {
+    try {
+      return decodeURIComponent(str);
+    } catch {
+      return str;
+    }
+  }
+
   function extractSteamId(input) {
     if (!input) return null;
 
-    input = decodeURIComponent(input.trim());
+    input = safeDecode(input.trim());
 
     // Просто SteamID64
     if (/^\d{17}$/.test(input)) {
@@ -79,285 +92,163 @@ export default async function handler(req, res) {
       /steamcommunity\.com\/profiles\/(\d{17})/i
     );
 
-    if (profileMatch) {
-      return profileMatch[1];
-    }
-
-    return null;
+    return profileMatch ? profileMatch[1] : null;
   }
 
+  // Запрос к Steam с таймаутом. Никогда не бросает исключение:
+  // при любой ошибке возвращает { ok: false }.
+  async function fetchSteam(path, params) {
+    const url =
+      `https://api.steampowered.com${path}/` +
+      `?key=${encodeURIComponent(API_KEY)}` +
+      `&${new URLSearchParams(params)}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) return { ok: false, data: null };
+      return { ok: true, data: await response.json() };
+    } catch {
+      return { ok: false, data: null };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // ==============================
+  // Основной сценарий
+  // ==============================
   try {
-    // ==============================
-    // Проверяем API ключ
-    // ==============================
-    if (!API_KEY) {
-      res.status(200).send("❌ STEAM_API_KEY не задан");
-      return;
-    }
+    if (!API_KEY) return send("❌ STEAM_API_KEY не задан");
 
-    // ==============================
-    // Получаем steamid
-    // ==============================
     let input = req.query?.steamid;
-
-    if (Array.isArray(input)) {
-      input = input[0];
-    }
-
-    if (!input) {
-      res.status(200).send("❌ Укажи Steam профиль");
-      return;
-    }
+    if (Array.isArray(input)) input = input[0];
+    if (!input) return send("❌ Укажи Steam профиль");
 
     // ==============================
-    // Определяем SteamID
+    // Определяем SteamID64
     // ==============================
     let steamId = extractSteamId(input);
+    let attemptedVanity = false;
 
-    // ==============================
-    // Vanity URL
-    // /id/username
-    // ==============================
+    // Vanity URL — /id/username
     if (!steamId) {
       const vanityMatch = input.match(
         /steamcommunity\.com\/id\/([^\/?#]+)/i
       );
 
       if (vanityMatch) {
-        const vanity = vanityMatch[1];
+        attemptedVanity = true;
 
-        const resolveUrl =
-          `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/` +
-          `?key=${encodeURIComponent(API_KEY)}` +
-          `&vanityurl=${encodeURIComponent(vanity)}`;
-
-        const resolveResponse = await fetch(resolveUrl);
-
-        if (!resolveResponse.ok) {
-          res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
-          return;
-        }
-
-        const resolveData = await resolveResponse.json();
+        const resolve = await fetchSteam(
+          "ISteamUser/ResolveVanityURL/v0001",
+          { vanityurl: vanityMatch[1] }
+        );
 
         if (
-          !resolveData.response ||
-          resolveData.response.success !== 1 ||
-          !resolveData.response.steamid
+          resolve.ok &&
+          resolve.data?.response?.success === 1 &&
+          resolve.data.response.steamid
         ) {
-          res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
-          return;
+          steamId = resolve.data.response.steamid;
         }
-
-        steamId = resolveData.response.steamid;
       }
     }
 
-    if (!steamId) {
-      res.status(200).send(`❌ Неверная ссылка Steam. Используй SteamID64 или ссылку /profiles/ID либо /id/имя. Инструкция: ${STEAM_HELP_URL}`);
-      return;
-    }
+    if (!steamId) return attemptedVanity ? notFound() : invalidInput();
 
     // ==============================
-    // Получаем Steam профиль
+    // Получаем профиль, время игры и статистику
+    // параллельно — все три зависят только от steamId
     // ==============================
-    const profileUrl =
-      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/` +
-      `?key=${encodeURIComponent(API_KEY)}` +
-      `&steamids=${encodeURIComponent(steamId)}`;
+    const [profile, games, stats] = await Promise.all([
+      fetchSteam("ISteamUser/GetPlayerSummaries/v0002", {
+        steamids: steamId
+      }),
+      fetchSteam("IPlayerService/GetOwnedGames/v0001", {
+        steamid: steamId,
+        format: "json",
+        include_played_free_games: 1, // DBD — бесплатная игра, по умолчанию не возвращается
+        include_appinfo: 0,
+        "appids_filter[0]": DBD_APP_ID
+      }),
+      fetchSteam("ISteamUserStats/GetUserStatsForGame/v0002", {
+        appid: DBD_APP_ID,
+        steamid: steamId
+      })
+    ]);
 
-    const profileResponse = await fetch(profileUrl);
+    // ==============================
+    // Никнейм
+    // ==============================
+    const player = profile.ok
+      ? profile.data?.response?.players?.[0]
+      : null;
 
-    if (!profileResponse.ok) {
-      res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
-      return;
-    }
-
-    let profileData;
-
-    try {
-      profileData = await profileResponse.json();
-    } catch (error) {
-      res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
-      return;
-    }
-
-    const player = profileData?.response?.players?.[0];
-
-    if (!player) {
-      res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
-      return;
-    }
+    if (!player) return notFound();
 
     const nickname = player.personaname || "Неизвестно";
 
     // ==============================
-    // Получаем время игры DBD
-    //
-    // ВАЖНО:
-    // Dead by Daylight — бесплатная игра.
-    // Steam GetOwnedGames по умолчанию
-    // не возвращает бесплатные игры.
-    //
-    // Поэтому обязательно:
-    // include_played_free_games=1
-    // и сразу фильтруем AppID 381210.
+    // Время игры DBD
     // ==============================
     let playtimeHours = null;
 
-    try {
-      const gamesUrl =
-        `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/` +
-        `?key=${encodeURIComponent(API_KEY)}` +
-        `&steamid=${encodeURIComponent(steamId)}` +
-        `&format=json` +
-        `&include_played_free_games=1` +
-        `&include_appinfo=0` +
-        `&appids_filter[0]=381210`;
+    if (games.ok) {
+      const dbdGame = games.data?.response?.games?.find(
+        (game) => Number(game.appid) === DBD_APP_ID
+      );
 
-      const gamesResponse = await fetch(gamesUrl);
-
-      if (gamesResponse.ok) {
-        const gamesData = await gamesResponse.json();
-
-        const dbdGame =
-          gamesData?.response?.games?.find(
-            game => Number(game.appid) === 381210
-          );
-
-        if (
-          dbdGame &&
-          typeof dbdGame.playtime_forever === "number"
-        ) {
-          playtimeHours =
-            dbdGame.playtime_forever / 60;
-        }
+      if (dbdGame && typeof dbdGame.playtime_forever === "number") {
+        playtimeHours = dbdGame.playtime_forever / 60;
       }
-    } catch (error) {
-      playtimeHours = null;
     }
 
     const playtimeText =
       playtimeHours !== null
         ? `⏱ ${playtimeHours.toFixed(1)} ч`
-        : `⏱ Время игры скрыто`;
+        : "⏱ Время игры скрыто";
 
     // ==============================
-    // Получаем статистику DBD
+    // Статистика DBD
     // ==============================
-    const statsUrl =
-      `https://api.steampowered.com/ISteamUserStats/GetUserStatsForGame/v0002/` +
-      `?appid=381210` +
-      `&key=${encodeURIComponent(API_KEY)}` +
-      `&steamid=${encodeURIComponent(steamId)}`;
+    const statsList = stats.ok
+      ? stats.data?.playerstats?.stats
+      : null;
 
-    let statsResponse;
-
-    try {
-      statsResponse = await fetch(statsUrl);
-    } catch (error) {
-      res.status(200).send(
+    if (!Array.isArray(statsList)) {
+      return send(
         `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
       );
-      return;
     }
 
-    if (!statsResponse.ok) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
-      );
-      return;
-    }
-
-    let statsData;
-
-    try {
-      statsData = await statsResponse.json();
-    } catch (error) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
-      );
-      return;
-    }
-
-    if (
-      !statsData ||
-      !statsData.playerstats ||
-      !Array.isArray(statsData.playerstats.stats)
-    ) {
-      res.status(200).send(
-        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
-      );
-      return;
+    // Превращаем массив Steam stats в объект
+    const stat = {};
+    for (const item of statsList) {
+      stat[item.name] = Number(item.value) || 0;
     }
 
     // ==============================
-    // Превращаем Steam stats в объект
+    // Итоговые значения
     // ==============================
-    const stats = {};
-
-    for (const item of statsData.playerstats.stats) {
-      stats[item.name] = Number(item.value) || 0;
-    }
-
-    // ==============================
-    // Killer / Survivor Grade
-    // ==============================
-    const killerPips =
-      stats.DBD_KillerSkulls || 0;
-
-    const survivorPips =
-      stats.DBD_CamperSkulls || 0;
-
-    const killerGrade =
-      getGrade(killerPips);
-
-    const survivorGrade =
-      getGrade(survivorPips);
-
-    // ==============================
-    // Убийства
-    // ==============================
-    const killedCampers =
-      stats.DBD_KilledCampers || 0;
-
-    const sacrificedCampers =
-      stats.DBD_SacrificedCampers || 0;
+    const killerGrade = getGrade(stat.DBD_KillerSkulls);
+    const survivorGrade = getGrade(stat.DBD_CamperSkulls);
 
     const totalKills =
-      killedCampers + sacrificedCampers;
+      (stat.DBD_KilledCampers || 0) +
+      (stat.DBD_SacrificedCampers || 0);
 
-    // ==============================
-    // Генераторы
-    // ==============================
-    const generators =
-      Math.round(
-        stats.DBD_GeneratorPct_float || 0
-      );
+    const generators = Math.round(stat.DBD_GeneratorPct_float || 0);
+    const maxPrestige = stat.DBD_BloodwebMaxPrestigeLevel || 0;
 
-    // ==============================
-    // Максимальный престиж
-    // ==============================
-    const maxPrestige =
-      stats.DBD_BloodwebMaxPrestigeLevel || 0;
-
-    // ==============================
-    // Побеги
-    // Обычный выход + люк
-    // ==============================
     const escapes =
-      (stats.DBD_Escape || 0) +
-      (stats.DBD_EscapeThroughHatch || 0);
+      (stat.DBD_Escape || 0) +
+      (stat.DBD_EscapeThroughHatch || 0);
 
-    // ==============================
-    // Очки крови
-    // ==============================
-    const bloodpoints =
-      stats.DBD_BloodwebPoints || 0;
+    const bloodpoints = stat.DBD_BloodwebPoints || 0;
 
-    // ==============================
-    // Итоговый результат
-    // ==============================
     const result =
       `👤 ${nickname}` +
       ` | ${playtimeText}` +
@@ -369,11 +260,17 @@ export default async function handler(req, res) {
       ` | ⚙️ Генераторов: ${generators}` +
       ` | 🩸 Очки крови (всего): ${formatNumber(bloodpoints)}`;
 
-    res.status(200).send(result);
+    // Кэш на CDN: повторные запросы по тому же steamid не бьют в Steam API
+    if (CACHE_TTL > 0) {
+      res.setHeader(
+        "Cache-Control",
+        `public, s-maxage=${CACHE_TTL}, stale-while-revalidate=${CACHE_TTL * 4}`
+      );
+    }
 
+    return send(result);
   } catch (error) {
     console.error(error);
-
-    res.status(200).send(`❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`);
+    return send(`❌ Внутренняя ошибка. Попробуй позже: ${STEAM_HELP_URL}`);
   }
 }

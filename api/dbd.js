@@ -118,7 +118,7 @@ export default async function handler(req, res) {
   // при любой ошибке возвращает { ok: false }.
   async function fetchSteam(path, params) {
     const url =
-      `https://api.steampowered.com${path}/` +
+      `https://api.steampowered.com/${path}/` +
       `?key=${encodeURIComponent(API_KEY)}` +
       `&${new URLSearchParams(params)}`;
 

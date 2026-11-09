@@ -258,18 +258,53 @@ export default async function handler(req, res) {
     const bloodpoints = stat.DBD_BloodwebPoints || 0;
 
     // ==============================
+    // Аналитика (уровень 1)
+    // ==============================
+    // Роль: соотношение матчей за выжившего / убийцу
+    const camperMatches = stat.DBD_CamperFullLoadout || 0;
+    const slasherMatches = stat.DBD_SlasherFullLoadout || 0;
+    const totalMatches = camperMatches + slasherMatches;
+
+    let roleText = "";
+    if (totalMatches > 0) {
+      const survivorPct = Math.round((camperMatches / totalMatches) * 100);
+      const killerPct = 100 - survivorPct;
+      if (survivorPct >= 60) roleText = `мейнит выжившего (${survivorPct}%)`;
+      else if (survivorPct <= 40) roleText = `мейнит убийцу (${killerPct}%)`;
+      else roleText = `выживший ${survivorPct}% / убийца ${killerPct}%`;
+    }
+
+    // Выживаемость
+    let survivalText = "";
+    if (camperMatches > 0) {
+      const survivalPct = Math.round((escapes / camperMatches) * 100);
+      survivalText = `выживаемость ~${survivalPct}%`;
+    }
+
+    // ==============================
     // Текстовый ответ (для ботов)
     // ==============================
-    const result =
-      `👤 ${nickname}` +
-      ` | ${playtimeText}` +
-      ` | 🔪 Ранг убийцы: ${killerGrade}` +
-      ` | 🧑 Ранг выжившего: ${survivorGrade}` +
-      ` | ☠️ Убийства: ${totalKills}` +
-      ` | 🏃 Побеги: ${escapes}` +
-      ` | ⭐ Макс. престиж: ${maxPrestige}` +
-      ` | ⚙️ Генераторов: ${generators}` +
-      ` | 🩸 Очки крови (всего): ${formatNumber(bloodpoints)}`;
+    const lines = [];
+
+    let bpLine = `🩸 ${formatNumber(bloodpoints)} BP`;
+    if (playtimeHours > 0) {
+      const bphK = Math.round(bloodpoints / playtimeHours / 1000);
+      bpLine += ` (${bphK} тыс/ч)`;
+    }
+    lines.push(`👤 ${nickname} · ${playtimeText} · ${bpLine}`);
+
+    lines.push(`🔪 Убийца: ${killerGrade} · ${totalKills} убийств`);
+
+    let survivorLine = `🧑 Выживший: ${survivorGrade} · ${escapes} побегов`;
+    if (survivalText) survivorLine += ` · ${survivalText}`;
+    lines.push(survivorLine);
+
+    let bottomLine = "";
+    if (roleText) bottomLine += `📊 ${roleText} · `;
+    bottomLine += `⭐ Престиж ${maxPrestige} · ⚙️ ${generators} генераторов`;
+    lines.push(bottomLine);
+
+    const result = lines.join("\n");
 
     // Кэш на CDN: повторные запросы по тому же steamid не бьют в Steam API
     if (CACHE_TTL > 0) {

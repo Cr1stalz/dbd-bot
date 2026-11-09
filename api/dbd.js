@@ -5,33 +5,14 @@ export default async function handler(req, res) {
   const TIMEOUT_MS = 8000; // лимит на каждый запрос к Steam
   const CACHE_TTL = 30;    // кэш CDN в секундах (поставь 0, чтобы отключить)
 
-  const format = String(req.query?.format || "").toLowerCase();
-  const asJson = format === "json";
-
   // ==============================
-  // Сообщения (текстовые — для ботов, short — для JSON)
+  // Сообщения
   // ==============================
   const MSG_NO_KEY = "❌ STEAM_API_KEY не задан";
   const MSG_NO_INPUT = "❌ Укажи Steam профиль";
   const MSG_NOT_FOUND = `❌ Не удалось найти Steam-профиль. Проверь ссылку и настройки приватности: ${STEAM_HELP_URL}`;
   const MSG_INVALID = `❌ Неверная ссылка Steam. Используй SteamID64, ссылку /profiles/ID, /id/имя или просто имя профиля. Инструкция: ${STEAM_HELP_URL}`;
   const MSG_INTERNAL = `❌ Внутренняя ошибка. Попробуй позже: ${STEAM_HELP_URL}`;
-
-  // ==============================
-  // Утилиты
-  // ==============================
-  // Ошибка: текст (для ботов) либо JSON (для оверлея).
-  function fail(short, text, extra) {
-    if (asJson) {
-      return res.status(200).json({
-        ok: false,
-        error: short,
-        help: STEAM_HELP_URL,
-        ...extra
-      });
-    }
-    return res.status(200).send(text);
-  }
 
   const send = (text) => res.status(200).send(text);
 
@@ -140,11 +121,11 @@ export default async function handler(req, res) {
   // Основной сценарий
   // ==============================
   try {
-    if (!API_KEY) return fail("Бот не настроен", MSG_NO_KEY);
+    if (!API_KEY) return send(MSG_NO_KEY);
 
     let input = req.query?.steamid;
     if (Array.isArray(input)) input = input[0];
-    if (!input) return fail("Укажи Steam профиль", MSG_NO_INPUT);
+    if (!input) return send(MSG_NO_INPUT);
 
     // ==============================
     // Определяем SteamID64
@@ -184,11 +165,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!steamId) {
-      return attemptedVanity
-        ? fail("Не удалось найти Steam-профиль", MSG_NOT_FOUND)
-        : fail("Неверная ссылка Steam", MSG_INVALID);
-    }
+    if (!steamId) return send(attemptedVanity ? MSG_NOT_FOUND : MSG_INVALID);
 
     // ==============================
     // Получаем профиль, время игры и статистику
@@ -218,7 +195,7 @@ export default async function handler(req, res) {
       ? profile.data?.response?.players?.[0]
       : null;
 
-    if (!player) return fail("Не удалось найти Steam-профиль", MSG_NOT_FOUND);
+    if (!player) return send(MSG_NOT_FOUND);
 
     const nickname = player.personaname || "Неизвестно";
 
@@ -250,13 +227,9 @@ export default async function handler(req, res) {
       : null;
 
     if (!Array.isArray(statsList)) {
-      const statsText =
-        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`;
-
-      return fail("Статистика DBD недоступна", statsText, {
-        nickname,
-        playtime: { hours: playtimeHours, hidden: playtimeHours === null }
-      });
+      return send(
+        `👤 ${nickname} | ${playtimeText} | 🎮 Статистика DBD недоступна. Проверь сведения об играх и настройки Steam: ${STEAM_HELP_URL}`
+      );
     }
 
     // Превращаем массив Steam stats в объект
@@ -268,11 +241,8 @@ export default async function handler(req, res) {
     // ==============================
     // Итоговые значения
     // ==============================
-    const killerPips = stat.DBD_KillerSkulls || 0;
-    const survivorPips = stat.DBD_CamperSkulls || 0;
-
-    const killerGrade = getGrade(killerPips);
-    const survivorGrade = getGrade(survivorPips);
+    const killerGrade = getGrade(stat.DBD_KillerSkulls);
+    const survivorGrade = getGrade(stat.DBD_CamperSkulls);
 
     const totalKills =
       (stat.DBD_KilledCampers || 0) +
@@ -288,33 +258,7 @@ export default async function handler(req, res) {
     const bloodpoints = stat.DBD_BloodwebPoints || 0;
 
     // ==============================
-    // Структурированные данные (для JSON / оверлея)
-    // ==============================
-    const data = {
-      ok: true,
-      nickname,
-      steamid: steamId,
-      profileUrl: `https://steamcommunity.com/profiles/${steamId}`,
-      playtime: { hours: playtimeHours, hidden: playtimeHours === null },
-      killer: { grade: killerGrade, pips: killerPips },
-      survivor: { grade: survivorGrade, pips: survivorPips },
-      kills: {
-        killed: stat.DBD_KilledCampers || 0,
-        sacrificed: stat.DBD_SacrificedCampers || 0,
-        total: totalKills
-      },
-      escapes: {
-        normal: stat.DBD_Escape || 0,
-        hatch: stat.DBD_EscapeThroughHatch || 0,
-        total: escapes
-      },
-      maxPrestige,
-      generators,
-      bloodpoints
-    };
-
-    // ==============================
-    // Текстовый ответ (для ботов) — формат сохранён 1-в-1
+    // Текстовый ответ (для ботов)
     // ==============================
     const result =
       `👤 ${nickname}` +
@@ -335,13 +279,9 @@ export default async function handler(req, res) {
       );
     }
 
-    if (asJson) {
-      return res.status(200).json(data);
-    }
-
     return send(result);
   } catch (error) {
     console.error(error);
-    return fail("Внутренняя ошибка", MSG_INTERNAL);
+    return send(MSG_INTERNAL);
   }
 }

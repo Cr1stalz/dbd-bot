@@ -423,7 +423,7 @@
 
     <div class="preview">
       <div class="preview-frame">
-        <iframe id="preview" src="index.html?bg=dark" title="Предпросмотр оверлея"></iframe>
+        <iframe id="preview" src="index.html" title="Предпросмотр оверлея"></iframe>
       </div>
       <div class="preview-info">
         <h3>Так это выглядит на стриме</h3>
@@ -451,13 +451,12 @@
       </div>
 
       <div class="code-box">
-        <span id="fileUrl">file:///C:/Users/Cr1stalz/Documents/Проект по умолчанию/dbd-bot/overlay/index.html</span>
+        <span id="fileUrl">https://dbd-bot-livid.vercel.app/overlay/</span>
         <button class="copy-btn" onclick="copyText(document.getElementById('fileUrl').textContent)" title="Копировать">⧉</button>
       </div>
 
       <div class="hint">
-        💡 Проще нажать <b>«Обзор»</b> рядом с полем URL и выбрать файл
-        <b>index.html</b> из папки <b>overlay</b>.
+        💡 Вставь ссылку в поле <b>URL</b> источника «Браузер».
       </div>
 
       <div class="hint">
@@ -551,89 +550,16 @@
             <td>Длительность. DS 1 / 2 / 3 уровня — 40 / 50 / 60</td>
           </tr>
           <tr>
-            <td><code>sound=1</code></td>
-            <td>выкл</td>
-            <td>Писк на старте, на последних 3 секундах и в конце</td>
-          </tr>
-          <tr>
-            <td><code>warn=10</code></td>
-            <td>10</td>
-            <td>За сколько секунд включать жёлтую пульсацию</td>
-          </tr>
-          <tr>
-            <td><code>critical=5</code></td>
-            <td>5</td>
-            <td>За сколько секунд включать красную пульсацию</td>
-          </tr>
-          <tr>
             <td><code>label=Текст</code></td>
             <td>Решающий удар</td>
             <td>Подпись под цифрой</td>
-          </tr>
-          <tr>
-            <td><code>icon=URL</code></td>
-            <td>icon.webp</td>
-            <td>Своя иконка вместо файла рядом</td>
-          </tr>
-          <tr>
-            <td><code>bg=dark</code></td>
-            <td>—</td>
-            <td>Тёмная подложка (только для проверки в браузере)</td>
           </tr>
         </tbody>
       </table>
 
       <div class="hint">
-        Пример: <b>…/overlay/index.html?d=40&amp;sound=1</b> — 40 секунд и со звуком.
+        Пример: <b>…/overlay/?d=40</b> — 40 секунд.
       </div>
-    </div>
-
-    <!-- 5 -->
-
-    <div class="card">
-      <div class="step-title">
-        <div class="step-number">5</div>
-        <div>
-          <h2>Продвинуто: запуск по другому источнику</h2>
-          <p>Через OBS WebSocket</p>
-        </div>
-      </div>
-
-      <p style="margin:0 0 14px;color:#a8a8b3;font-size:14px;line-height:1.65;">
-        Если оверлей всегда висит на экране, а запускать его нужно по видимости
-        другого источника (например, картинки «зацепили») — включи WebSocket:
-        <b>Сервис → Настройки сервера WebSocket</b>.
-      </p>
-
-      <div class="code-box">
-        <span>index.html?mode=obs&amp;scene=Игра&amp;source=DS&amp;pass=ПАРОЛЬ</span>
-        <button class="copy-btn" onclick="copyText('index.html?mode=obs&scene=Игра&source=DS&pass=ПАРОЛЬ')" title="Копировать">⧉</button>
-      </div>
-
-      <div class="hint">
-        <b>scene</b> — сцена, где лежит источник-триггер, <b>source</b> — его имя,
-        <b>pass</b> — пароль из настроек WebSocket. Порт по умолчанию 4455,
-        можно задать свой: <b>ws=ws://127.0.0.1:4455</b>.
-        Отключить сброс при скрытии: <b>resetonhide=0</b>.
-      </div>
-    </div>
-
-    <!-- 6 -->
-
-    <div class="card">
-      <div class="step-title">
-        <div class="step-number">6</div>
-        <div>
-          <h2>Своя иконка</h2>
-          <p>Рядом с index.html уже лежит icon.webp</p>
-        </div>
-      </div>
-
-      <p style="margin:0;color:#a8a8b3;font-size:14px;line-height:1.7;">
-        Оверлей автоматически берёт <b>icon.webp</b> из своей папки. Хочешь другую
-        картинку — замени файл на свою (квадратную, с прозрачным фоном) или укажи
-        путь через <b>?icon=</b>. Если картинки нет — включится нарисованная заглушка.
-      </p>
     </div>
 
     <!-- FAQ -->
@@ -689,7 +615,7 @@
 <script>
   function restartPreview() {
     var frame = document.getElementById("preview");
-    frame.src = "index.html?bg=dark&t=" + Date.now();
+    frame.src = "index.html?t=" + Date.now();
   }
 
   function copyText(text) {

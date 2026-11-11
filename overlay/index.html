@@ -151,11 +151,6 @@
 
   body[data-state="expired"] .perk { animation: expireFlash .5s ease-out 1; }
 
-  /* подложка только для предпросмотра в браузере (?bg=dark) */
-  body[data-bg="dark"] {
-    background: radial-gradient(circle at 50% 30%, #2a2438, #0b0a10 70%);
-  }
-
   .debug {
     position: fixed;
     left: 6px;
@@ -268,9 +263,6 @@
 
   var CFG = {
     duration: numArg(q.get("d"), 60),
-    warn: numArg(q.get("warn"), 10),
-    critical: numArg(q.get("critical"), 5),
-    sound: q.get("sound") === "1",
     label: q.get("label") || "Решающий удар",
     mode: q.get("mode") === "obs" ? "obs" : "load",
     obs: {
@@ -282,6 +274,9 @@
     }
   };
 
+  var WARN_AT = 10;
+  var CRITICAL_AT = 5;
+
   var stage = document.getElementById("stage");
   var perk = document.getElementById("perk");
   var sweep = document.getElementById("sweep");
@@ -290,7 +285,6 @@
   var debugEl = document.getElementById("debug");
 
   document.body.classList.toggle("debug", q.get("debug") === "1");
-  if (q.get("bg")) document.body.dataset.bg = q.get("bg");
   titleEl.textContent = CFG.label;
 
   var state = "idle";
@@ -299,11 +293,9 @@
   var lastSecond = -1;
   var lastShown = "";
 
-  /* иконка: icon.webp рядом с index.html, можно переопределить ?icon=... */
+  /* иконка: icon.webp рядом с index.html */
   (function initIcon() {
     var icon = document.getElementById("artIcon");
-    var custom = q.get("icon");
-    if (custom) icon.src = custom;
 
     function fallback() {
       perk.classList.add("no-icon");
@@ -327,7 +319,6 @@
   var audioCtx = null;
 
   function beep(freq, dur, vol) {
-    if (!CFG.sound) return;
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === "suspended") audioCtx.resume();
@@ -407,7 +398,7 @@
       return;
     }
 
-    var st = left <= CFG.critical ? "critical" : left <= CFG.warn ? "warn" : "running";
+    var st = left <= CRITICAL_AT ? "critical" : left <= WARN_AT ? "warn" : "running";
     if (state !== st) {
       setState(st);
     }

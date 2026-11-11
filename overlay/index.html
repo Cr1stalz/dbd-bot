@@ -115,19 +115,6 @@
       0 calc(var(--u) * .25) 0 rgba(0, 0, 0, .85);
   }
 
-  .status {
-    font-size: calc(var(--u) * 2.5);
-    font-weight: 700;
-    letter-spacing: .3em;
-    text-indent: .3em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, .5);
-    margin-top: calc(var(--u) * -.4);
-    white-space: nowrap;
-    text-shadow: 0 0 calc(var(--u) * .5) rgba(0, 0, 0, .95);
-    transition: color .25s ease;
-  }
-
   /* ---------- СОСТОЯНИЯ ---------- */
 
   body[data-state="idle"] .perk { opacity: .3; filter: grayscale(1) drop-shadow(0 0 calc(var(--u) * 1.5) rgba(0, 0, 0, .5)); }
@@ -138,14 +125,11 @@
     filter: grayscale(.85) brightness(.75) drop-shadow(0 0 calc(var(--u) * 1.2) rgba(0, 0, 0, .5));
   }
   body[data-state="expired"] .num { color: rgba(255, 255, 255, .45); }
-  body[data-state="expired"] .status { color: rgba(239, 51, 64, .75); }
 
   body[data-state="warn"] .num { color: var(--warn); }
-  body[data-state="warn"] .status { color: rgba(255, 194, 77, .9); }
   body[data-state="warn"] .perk { animation: breathe 1s ease-in-out infinite; }
 
   body[data-state="critical"] .num { color: #ff5a63; }
-  body[data-state="critical"] .status { color: rgba(239, 51, 64, .95); }
   body[data-state="critical"] .perk { animation: breathe .55s ease-in-out infinite; }
 
   @keyframes breathe {
@@ -270,7 +254,6 @@
   <div class="num" id="num">60</div>
 
   <div class="title" id="title">Решающий удар</div>
-  <div class="status" id="status">Активен</div>
 
 </div>
 
@@ -304,7 +287,6 @@
   var sweep = document.getElementById("sweep");
   var numEl = document.getElementById("num");
   var titleEl = document.getElementById("title");
-  var statusEl = document.getElementById("status");
   var debugEl = document.getElementById("debug");
 
   document.body.classList.toggle("debug", q.get("debug") === "1");
@@ -334,10 +316,6 @@
   function setState(s) {
     state = s;
     document.body.dataset.state = s;
-  }
-
-  function setStatus(text) {
-    if (statusEl.textContent !== text) statusEl.textContent = text;
   }
 
   function debug(text) {
@@ -374,7 +352,6 @@
     lastSecond = -1;
     lastShown = "";
     setState("running");
-    setStatus("Активен");
     sweep.style.setProperty("--a", "0deg");
 
     stage.animate(
@@ -392,7 +369,6 @@
   function reset() {
     running = false;
     setState("idle");
-    setStatus("Ожидание");
     numEl.textContent = "—";
     sweep.style.setProperty("--a", "0deg");
     deadline = 0;
@@ -404,7 +380,6 @@
     if (!running) return;
     running = false;
     setState("expired");
-    setStatus("Окно закрыто");
     numEl.textContent = "0";
     sweep.style.setProperty("--a", "360deg");
     beep(180, 0.45, 0.3);
@@ -435,7 +410,6 @@
     var st = left <= CFG.critical ? "critical" : left <= CFG.warn ? "warn" : "running";
     if (state !== st) {
       setState(st);
-      setStatus(st === "critical" || st === "warn" ? "Истекает" : "Активен");
     }
 
     var sec = Math.ceil(left);
@@ -581,7 +555,6 @@
 
     ws.onclose = function () {
       connected = false;
-      if (state === "idle") setStatus("Нет связи");
       debug("obs: соединение закрыто, переподключение…");
       setTimeout(connectObs, 3000);
     };

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Решающий удар — таймер</title>
+
+<style>
+  :root {
+    --u: 1vmin;
+    --accent: #ef3340;
+    --warn: #ffc24d;
+    --dur: 60s;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: Bahnschrift, "DIN Alternate", "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    cursor: default;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--u) * 1.1);
+    padding: calc(var(--u) * 2);
+    transition: opacity .25s ease;
+  }
+
+  /* ---------- ИКОНКА ---------- */
+
+  .perk {
+    position: relative;
+    width: min(56vmin, 100%);
+    aspect-ratio: 1;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 calc(var(--u) * .8) calc(var(--u) * 2.2) rgba(0, 0, 0, .65));
+    transition: filter .35s ease, opacity .35s ease, transform .35s ease;
+    transform-origin: 50% 60%;
+  }
+
+  .perk svg { width: 100%; height: 100%; display: block; }
+
+  /* иконка перка (icon.webp рядом с файлом или ?icon=...) */
+  .perk.has-icon { background: var(--icon) center / contain no-repeat; }
+  .perk.has-icon svg { display: none; }
+  .perk.has-icon .sweep { clip-path: polygon(50% 2.5%, 97.5% 50%, 50% 97.5%, 2.5% 50%); }
+
+  .sweep {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(50% 11%, 89% 50%, 50% 89%, 11% 50%);
+    background: conic-gradient(
+      from 0deg,
+      rgba(255, 58, 58, .8) 0deg,
+      rgba(255, 58, 58, .8) var(--a, 0deg),
+      rgba(255, 58, 58, 0) var(--a, 0deg) 360deg
+    );
+    pointer-events: none;
+  }
+
+  /* ---------- ЦИФРА ---------- */
+
+  .num {
+    font-size: calc(var(--u) * 17);
+    line-height: .92;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-shadow:
+      0 0 calc(var(--u) * .6) rgba(0, 0, 0, .9),
+      0 calc(var(--u) * .35) 0 rgba(0, 0, 0, .8),
+      0 0 calc(var(--u) * 2.6) rgba(0, 0, 0, .7);
+    transform-origin: 50% 50%;
+    will-change: transform;
+  }
+
+  /* ---------- ПОДПИСЬ ---------- */
+
+  .title {
+    font-size: calc(var(--u) * 4.1);
+    font-weight: 700;
+    letter-spacing: .22em;
+    text-indent: .22em;
+    text-transform: uppercase;
+    color: #fff;
+    opacity: .92;
+    white-space: nowrap;
+    text-shadow:
+      0 0 calc(var(--u) * .5) rgba(0, 0, 0, .95),
+      0 calc(var(--u) * .25) 0 rgba(0, 0, 0, .85);
+  }
+
+  .status {
+    font-size: calc(var(--u) * 2.5);
+    font-weight: 700;
+    letter-spacing: .3em;
+    text-indent: .3em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .5);
+    margin-top: calc(var(--u) * -.4);
+    white-space: nowrap;
+    text-shadow: 0 0 calc(var(--u) * .5) rgba(0, 0, 0, .95);
+    transition: color .25s ease;
+  }
+
+  /* ---------- СОСТОЯНИЯ ---------- */
+
+  body[data-state="idle"] .perk { opacity: .3; filter: grayscale(1) drop-shadow(0 0 calc(var(--u) * 1.5) rgba(0, 0, 0, .5)); }
+  body[data-state="idle"] .num { opacity: .55; }
+
+  body[data-state="expired"] .perk {
+    opacity: .38;
+    filter: grayscale(.85) brightness(.75) drop-shadow(0 0 calc(var(--u) * 1.2) rgba(0, 0, 0, .5));
+  }
+  body[data-state="expired"] .num { color: rgba(255, 255, 255, .45); }
+  body[data-state="expired"] .status { color: rgba(239, 51, 64, .75); }
+
+  body[data-state="warn"] .num { color: var(--warn); }
+  body[data-state="warn"] .status { color: rgba(255, 194, 77, .9); }
+  body[data-state="warn"] .perk { animation: breathe 1s ease-in-out infinite; }
+
+  body[data-state="critical"] .num { color: #ff5a63; }
+  body[data-state="critical"] .status { color: rgba(239, 51, 64, .95); }
+  body[data-state="critical"] .perk { animation: breathe .55s ease-in-out infinite; }
+
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.045); }
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.13); }
+    100% { transform: scale(1); }
+  }
+
+  /* вспышка в момент, когда окно закрылось */
+  @keyframes expireFlash {
+    0% { opacity: 1; filter: drop-shadow(0 0 calc(var(--u) * 3) rgba(239, 51, 64, .9)); }
+    100% { opacity: .38; filter: grayscale(.85) brightness(.75) drop-shadow(0 0 calc(var(--u) * 1.2) rgba(0, 0, 0, .5)); }
+  }
+
+  body[data-state="expired"] .perk { animation: expireFlash .5s ease-out 1; }
+
+  /* подложка только для предпросмотра в браузере (?bg=dark) */
+  body[data-bg="dark"] {
+    background: radial-gradient(circle at 50% 30%, #2a2438, #0b0a10 70%);
+  }
+
+  .debug {
+    position: fixed;
+    left: 6px;
+    bottom: 4px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, .55);
+    font-family: Consolas, monospace;
+    opacity: 0;
+    pointer-events: none;
+  }
+  body.debug .debug { opacity: 1; }
+</style>
+</head>
+
+<body data-state="idle">
+
+<div class="stage" id="stage">
+
+  <div class="perk" id="perk">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="pg" x1="0" y1="0" x2=".55" y2="1">
+          <stop offset="0" stop-color="#7d5eb2"/>
+          <stop offset=".5" stop-color="#5b3f8a"/>
+          <stop offset="1" stop-color="#382550"/>
+        </linearGradient>
+
+        <radialGradient id="vig" cx=".5" cy=".45" r=".62">
+          <stop offset=".35" stop-color="#000" stop-opacity="0"/>
+          <stop offset="1" stop-color="#000" stop-opacity=".5"/>
+        </radialGradient>
+
+        <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ffffff"/>
+          <stop offset=".55" stop-color="#f2eef8"/>
+          <stop offset="1" stop-color="#c8c1d8"/>
+        </linearGradient>
+
+        <clipPath id="inner">
+          <path d="M100 21 L179 100 L100 179 L21 100 Z"/>
+        </clipPath>
+      </defs>
+
+      <!-- рамка -->
+      <path d="M100 3 L197 100 L100 197 L3 100 Z" fill="#0a0a0e"/>
+      <path d="M100 21 L179 100 L100 179 L21 100 Z" fill="url(#pg)"/>
+
+      <!-- арт -->
+      <g clip-path="url(#inner)">
+        <g transform="rotate(45 100 100)">
+          <!-- рукав -->
+          <rect x="150" y="4" width="66" height="90" rx="12" fill="#cfc6de"/>
+          <path d="M150 4 V94" stroke="#4a3270" stroke-opacity=".45" stroke-width="3.5"/>
+          <path d="M160 6 V96" stroke="#4a3270" stroke-opacity=".28" stroke-width="4"/>
+          <path d="M170 7 V95" stroke="#4a3270" stroke-opacity=".18" stroke-width="4"/>
+          <path d="M180 8 V94" stroke="#4a3270" stroke-opacity=".18" stroke-width="4"/>
+
+          <!-- лезвие -->
+          <path d="M80 -16 L120 -16 L111 142 L100 202 L89 142 Z" fill="url(#blade)"/>
+          <path d="M100 -16 L120 -16 L111 142 L100 202 Z" fill="#bcb2cd" opacity=".55"/>
+          <path d="M94 -16 L100 -16 L100 202 L94 142 Z" fill="#ffffff" opacity=".55"/>
+
+          <!-- ладонь -->
+          <rect x="118" y="12" width="36" height="78" rx="18" fill="#fff"/>
+
+          <!-- пальцы -->
+          <rect x="78" y="16" width="70" height="13" rx="6.5" fill="#fff" transform="rotate(-3 113 22)"/>
+          <rect x="76" y="31" width="72" height="13" rx="6.5" fill="#fff" transform="rotate(-1 112 37)"/>
+          <rect x="76" y="46" width="72" height="13" rx="6.5" fill="#fff" transform="rotate(1 112 52)"/>
+          <rect x="80" y="61" width="68" height="13" rx="6.5" fill="#fff" transform="rotate(3 114 67)"/>
+
+          <!-- большой палец -->
+          <rect x="86" y="78" width="58" height="19" rx="9.5" fill="#fff"
+                stroke="#4a3270" stroke-opacity=".28" stroke-width="1.5"
+                transform="rotate(-12 115 87)"/>
+
+          <!-- тени-разделители -->
+          <g stroke="#4a3270" stroke-opacity=".35" stroke-width="1.8" stroke-linecap="round">
+            <path d="M78 29.5 H116"/>
+            <path d="M76 44.5 H116"/>
+            <path d="M76 59.5 H116"/>
+          </g>
+        </g>
+      </g>
+
+      <!-- виньетка и обводка -->
+      <path d="M100 21 L179 100 L100 179 L21 100 Z" fill="url(#vig)"/>
+      <path d="M100 21 L179 100 L100 179 L21 100 Z" fill="none" stroke="#0a0a0e" stroke-opacity=".55" stroke-width="3.5"/>
+      <path d="M100 3 L197 100 L100 197 L3 100 Z" fill="none" stroke="#26262e" stroke-width="1"/>
+    </svg>
+
+    <div class="sweep" id="sweep"></div>
+  </div>
+
+  <div class="num" id="num">60</div>
+
+  <div class="title" id="title">Решающий удар</div>
+  <div class="status" id="status">Активен</div>
+
+</div>
+
+<div class="debug" id="debug"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var q = new URLSearchParams(location.search);
+  var numArg = function (v, def) { var n = parseFloat(v); return isFinite(n) && n > 0 ? n : def; };
+
+  var CFG = {
+    duration: numArg(q.get("d"), 60),
+    warn: numArg(q.get("warn"), 10),
+    critical: numArg(q.get("critical"), 5),
+    sound: q.get("sound") === "1",
+    label: q.get("label") || "Решающий удар",
+    mode: q.get("mode") === "obs" ? "obs" : "load",
+    obs: {
+      url: q.get("ws") || "ws://127.0.0.1:4455",
+      password: q.get("pass") || "",
+      scene: q.get("scene") || "",
+      source: q.get("source") || "",
+      resetOnHide: q.get("resetonhide") !== "0"
+    }
+  };
+
+  var stage = document.getElementById("stage");
+  var perk = document.getElementById("perk");
+  var sweep = document.getElementById("sweep");
+  var numEl = document.getElementById("num");
+  var titleEl = document.getElementById("title");
+  var statusEl = document.getElementById("status");
+  var debugEl = document.getElementById("debug");
+
+  document.body.classList.toggle("debug", q.get("debug") === "1");
+  if (q.get("bg")) document.body.dataset.bg = q.get("bg");
+  titleEl.textContent = CFG.label;
+
+  var state = "idle";
+  var running = false;
+  var deadline = 0;
+  var lastSecond = -1;
+  var lastShown = "";
+
+  /* иконка: ?icon=путь, либо icon.webp / icon.png рядом с index.html */
+  function useIcon(url) {
+    perk.style.setProperty("--icon", 'url("' + url + '")');
+    perk.classList.add("has-icon");
+  }
+
+  (function initIcon() {
+    var custom = q.get("icon");
+    if (custom) { useIcon(custom); return; }
+
+    var names = ["icon.webp", "icon.png", "icon.jpg"];
+    (function tryNext(i) {
+      if (i >= names.length) return; // останется нарисованная иконка
+      var img = new Image();
+      img.onload = function () { useIcon(names[i]); };
+      img.onerror = function () { tryNext(i + 1); };
+      img.src = names[i];
+    })(0);
+  })();
+
+  function setState(s) {
+    state = s;
+    document.body.dataset.state = s;
+  }
+
+  function setStatus(text) {
+    if (statusEl.textContent !== text) statusEl.textContent = text;
+  }
+
+  function debug(text) {
+    debugEl.textContent = text;
+  }
+
+  /* ---------------- звук ---------------- */
+
+  var audioCtx = null;
+
+  function beep(freq, dur, vol) {
+    if (!CFG.sound) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(vol || 0.2, audioCtx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + dur + 0.02);
+    } catch (e) { /* звук не критичен */ }
+  }
+
+  /* ---------------- таймер ---------------- */
+
+  function start() {
+    deadline = performance.now() + CFG.duration * 1000;
+    running = true;
+    lastSecond = -1;
+    lastShown = "";
+    setState("running");
+    setStatus("Активен");
+    sweep.style.setProperty("--a", "0deg");
+
+    stage.animate(
+      [
+        { transform: "scale(.84)", opacity: 0 },
+        { transform: "scale(1)", opacity: 1 }
+      ],
+      { duration: 380, easing: "cubic-bezier(.2,1.3,.35,1)" }
+    );
+
+    beep(680, 0.09, 0.25);
+    debug("start " + CFG.duration + "s");
+  }
+
+  function reset() {
+    running = false;
+    setState("idle");
+    setStatus("Ожидание");
+    numEl.textContent = "—";
+    sweep.style.setProperty("--a", "0deg");
+    deadline = 0;
+    lastSecond = -1;
+    lastShown = "";
+  }
+
+  function expire() {
+    if (!running) return;
+    running = false;
+    setState("expired");
+    setStatus("Окно закрыто");
+    numEl.textContent = "0";
+    sweep.style.setProperty("--a", "360deg");
+    beep(180, 0.45, 0.3);
+    debug("expired");
+  }
+
+  function setNumber(left) {
+    var text = String(Math.max(0, Math.ceil(left - 0.0001)));
+    if (text !== lastShown) {
+      lastShown = text;
+      numEl.textContent = text;
+    }
+  }
+
+  function tick(now) {
+    if (!running) return;
+
+    var left = Math.max(0, (deadline - now) / 1000);
+
+    setNumber(left);
+    sweep.style.setProperty("--a", ((1 - left / CFG.duration) * 360).toFixed(1) + "deg");
+
+    if (left <= 0) {
+      expire();
+      return;
+    }
+
+    var st = left <= CFG.critical ? "critical" : left <= CFG.warn ? "warn" : "running";
+    if (state !== st) {
+      setState(st);
+      setStatus(st === "critical" || st === "warn" ? "Истекает" : "Активен");
+    }
+
+    var sec = Math.ceil(left);
+    if (sec !== lastSecond) {
+      var isTick = lastSecond !== -1;
+      lastSecond = sec;
+      if (left < CFG.duration) {
+        numEl.animate(
+          [{ transform: "scale(1)" }, { transform: "scale(1.09)" }, { transform: "scale(1)" }],
+          { duration: 260, easing: "ease-out" }
+        );
+        if (isTick && sec <= 3 && sec > 0) beep(880, 0.06, 0.16);
+      }
+    }
+  }
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    tick(now);
+  }
+
+  // страховка на случай, если браузер (OBS) притормозил requestAnimationFrame
+  setInterval(function () { tick(performance.now()); }, 250);
+
+  /* ---------------- триггер по OBS WebSocket ---------------- */
+
+  var ws = null;
+  var reqId = 1;
+  var pending = {};
+  var connected = false;
+  var sceneItemId = null;
+
+  function b64(bytes) {
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+
+  function sha256(str) {
+    return crypto.subtle
+      .digest("SHA-256", new TextEncoder().encode(str))
+      .then(function (buf) { return b64(new Uint8Array(buf)); });
+  }
+
+  function authString(password, salt, challenge) {
+    return sha256(password + salt).then(function (secret) {
+      return sha256(secret + challenge);
+    });
+  }
+
+  function request(type, data) {
+    return new Promise(function (resolve, reject) {
+      var id = String(reqId++);
+      pending[id] = { resolve: resolve, reject: reject };
+      ws.send(JSON.stringify({ op: 6, d: { requestType: type, requestId: id, requestData: data || {} } }));
+      setTimeout(function () {
+        if (pending[id]) { delete pending[id]; reject(new Error("timeout")); }
+      }, 5000);
+    });
+  }
+
+  function onIdentified() {
+    connected = true;
+    debug("obs: подключено");
+
+    if (!CFG.obs.scene || !CFG.obs.source) {
+      debug("obs: не заданы scene/source — старт по загрузке");
+      start();
+      return;
+    }
+
+    request("GetSceneItemId", { sceneName: CFG.obs.scene, sourceName: CFG.obs.source })
+      .then(function (r) {
+        sceneItemId = r.responseData.sceneItemId;
+        debug("obs: item " + sceneItemId);
+        return request("GetSceneItemEnabled", { sceneName: CFG.obs.scene, sceneItemId: sceneItemId });
+      })
+      .then(function (r) {
+        if (r.responseData.sceneItemEnabled) start();
+        else reset();
+      })
+      .catch(function (e) {
+        debug("obs: ошибка — " + e.message);
+        reset();
+      });
+  }
+
+  function connectObs() {
+    try {
+      ws = new WebSocket(CFG.obs.url);
+    } catch (e) {
+      setTimeout(connectObs, 3000);
+      return;
+    }
+
+    ws.onmessage = function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+
+      if (msg.op === 0) {
+        var identify = { rpcVersion: 1 };
+        var auth = msg.d && msg.d.authentication;
+        if (auth) {
+          authString(CFG.obs.password, auth.salt, auth.challenge)
+            .then(function (sig) {
+              identify.authentication = sig;
+              ws.send(JSON.stringify({ op: 1, d: identify }));
+            })
+            .catch(function (e) {
+              debug("obs: нет crypto.subtle — " + e.message);
+              reset();
+            });
+        } else {
+          ws.send(JSON.stringify({ op: 1, d: identify }));
+        }
+        return;
+      }
+
+      if (msg.op === 2) { onIdentified(); return; }
+
+      if (msg.op === 5) {
+        var d = msg.d || {};
+        if (
+          d.eventType === "SceneItemEnableStateChanged" &&
+          d.eventData &&
+          sceneItemId !== null &&
+          d.eventData.sceneItemId === sceneItemId
+        ) {
+          if (d.eventData.sceneItemEnabled) start();
+          else if (CFG.obs.resetOnHide) reset();
+        }
+        return;
+      }
+
+      if (msg.op === 7) {
+        var p = pending[msg.d.requestId];
+        if (!p) return;
+        delete pending[msg.d.requestId];
+        if (msg.d.requestStatus && msg.d.requestStatus.result) p.resolve(msg.d);
+        else p.reject(new Error(msg.d.requestStatus && msg.d.requestStatus.comment || "error"));
+      }
+    };
+
+    ws.onclose = function () {
+      connected = false;
+      if (state === "idle") setStatus("Нет связи");
+      debug("obs: соединение закрыто, переподключение…");
+      setTimeout(connectObs, 3000);
+    };
+
+    ws.onerror = function () { /* onclose переподключится */ };
+  }
+
+  /* ---------------- запуск ---------------- */
+
+  requestAnimationFrame(loop);
+
+  window.DS = {
+    start: start,
+    reset: reset,
+    expire: expire,
+    get state() { return state; },
+    get connected() { return connected; }
+  };
+
+  window.addEventListener("message", function (e) {
+    var type = e.data && e.data.type;
+    if (type === "ds:start") start();
+    if (type === "ds:reset") reset();
+  });
+
+  if (CFG.mode === "obs") {
+    reset();
+    connectObs();
+  } else {
+    // «Обновлять браузер при активации сцены» / «Завершать работу, когда не виден»
+    // перезагружают страницу — значит старт по загрузке = старт по показу источника.
+    requestAnimationFrame(start);
+  }
+})();
+</script>
+
+</body>
+</html>

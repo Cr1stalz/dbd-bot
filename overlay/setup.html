@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Таймер «Решающий удар» — инструкция</title>
+
+<link rel="icon" href="icon.webp">
+
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at 50% -10%, rgba(239, 51, 64, .13), transparent 35%),
+      linear-gradient(180deg, #09090c 0%, #0d0d12 100%);
+    color: #f1f1f4;
+    font-family: Inter, Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  .container {
+    width: min(1020px, calc(100% - 32px));
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: #0b0b0f;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+  }
+
+  .header-inner {
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: -.3px;
+  }
+
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ef3340, #a91522);
+    box-shadow: 0 0 25px rgba(239, 51, 64, .2);
+    font-size: 17px;
+  }
+
+  .discord {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b8b8c2;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .discord-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #ef3340;
+    box-shadow: 0 0 8px rgba(239, 51, 64, .9), 0 0 16px rgba(239, 51, 64, .45);
+  }
+
+  .discord-name { color: #fff; font-weight: 700; }
+
+  /* HERO */
+
+  .hero {
+    text-align: center;
+    padding: 64px 0 40px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 999px;
+    background: rgba(239, 51, 64, .08);
+    border: 1px solid rgba(239, 51, 64, .25);
+    color: #ff9299;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 {
+    margin: 0;
+    font-size: clamp(32px, 5.5vw, 56px);
+    line-height: 1.02;
+    letter-spacing: -2px;
+    font-weight: 900;
+  }
+
+  .hero h1 span { color: #ef3340; }
+
+  .hero p {
+    max-width: 620px;
+    margin: 18px auto 0;
+    color: #a3a3af;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  /* PREVIEW */
+
+  .preview {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 24px;
+    border-radius: 20px;
+    background: rgba(19, 19, 25, .88);
+    border: 1px solid rgba(255, 255, 255, .075);
+    margin-bottom: 26px;
+  }
+
+  .preview-frame {
+    width: 300px;
+    height: 300px;
+    flex-shrink: 0;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .08);
+    background: #0b0a10;
+  }
+
+  .preview-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  .preview-info h3 {
+    margin: 0 0 8px;
+    font-size: 19px;
+  }
+
+  .preview-info p {
+    margin: 0 0 16px;
+    color: #8e8e99;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* STEPS */
+
+  .steps {
+    display: grid;
+    gap: 20px;
+    padding-bottom: 50px;
+  }
+
+  .card {
+    position: relative;
+    background: rgba(19, 19, 25, .88);
+    border: 1px solid rgba(255, 255, 255, .075);
+    border-radius: 20px;
+    padding: 26px;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(to bottom, #ef3340, transparent);
+    opacity: .8;
+  }
+
+  .step-title {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-bottom: 18px;
+  }
+
+  .step-number {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: rgba(239, 51, 64, .12);
+    border: 1px solid rgba(239, 51, 64, .25);
+    color: #ff5c66;
+    font-weight: 900;
+    font-size: 15px;
+  }
+
+  .step-title h2 { margin: 0; font-size: 19px; }
+
+  .step-title p { margin: 4px 0 0; color: #858591; font-size: 13px; }
+
+  .code-box {
+    position: relative;
+    background: #08080b;
+    border: 1px solid rgba(255, 255, 255, .07);
+    border-radius: 12px;
+    padding: 15px 52px 15px 16px;
+    font-family: Consolas, Monaco, monospace;
+    color: #e5e5eb;
+    font-size: 13px;
+    line-height: 1.55;
+    overflow-x: auto;
+    word-break: break-all;
+  }
+
+  .copy-btn {
+    position: absolute;
+    right: 9px;
+    top: 9px;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 9px;
+    background: #191920;
+    color: #aaaab5;
+    cursor: pointer;
+    transition: .2s;
+    font-size: 14px;
+  }
+
+  .copy-btn:hover { background: #26262e; color: #fff; }
+
+  .hint {
+    margin-top: 12px;
+    color: #777782;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+  .hint b { color: #b9b9c4; }
+
+  .check-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 10px;
+  }
+
+  .check-list li {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    padding: 13px 15px;
+    border-radius: 12px;
+    background: #14141b;
+    border: 1px solid rgba(255, 255, 255, .07);
+    font-size: 14px;
+    line-height: 1.5;
+    color: #d7d7de;
+  }
+
+  .check-list .box {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    border-radius: 6px;
+    background: #ef3340;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .check-list small {
+    display: block;
+    margin-top: 4px;
+    color: #83838f;
+    font-size: 12.5px;
+  }
+
+  /* TABLE */
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 11px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+    vertical-align: top;
+  }
+
+  th {
+    color: #8a8a96;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 700;
+  }
+
+  td code {
+    font-family: Consolas, Monaco, monospace;
+    background: rgba(239, 51, 64, .1);
+    border: 1px solid rgba(239, 51, 64, .22);
+    color: #ff8a92;
+    padding: 2px 7px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  td { color: #c8c8d1; }
+
+  /* BUTTON */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border: 0;
+    border-radius: 11px;
+    background: #ef3340;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: .2s;
+    font-family: inherit;
+  }
+
+  .btn:hover { background: #ff4a56; }
+  .btn:active { transform: scale(.98); }
+
+  .btn.ghost {
+    background: #191920;
+    color: #d3d3dc;
+    border: 1px solid rgba(255, 255, 255, .09);
+  }
+
+  .btn.ghost:hover { background: #232329; }
+
+  /* FOOTER */
+
+  footer {
+    padding: 10px 0 46px;
+    text-align: center;
+    color: #666671;
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  @media (max-width: 760px) {
+    .preview { flex-direction: column; align-items: stretch; }
+    .preview-frame { width: 100%; height: 280px; }
+    .hero { padding: 48px 0 32px; }
+    .card { padding: 20px 17px; }
+    table { font-size: 13px; }
+    th, td { padding: 9px 8px; }
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="container header-inner">
+    <div class="brand">
+      <div class="brand-icon">🔪</div>
+      <span>DBD Overlay</span>
+    </div>
+    <div class="discord">
+      <span class="discord-dot"></span>
+      <span>Discord:</span>
+      <span class="discord-name">@cr1stalz</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div class="container">
+      <div class="badge">⏱ Стартует сам, когда источник становится видимым</div>
+      <h1>Таймер <span>«Решающий удар»</span></h1>
+      <p>
+        Оверлей для OBS: иконка перка и обратный отсчёт 60 секунд —
+        окно Decisive Strike после снятия с крюка.
+      </p>
+    </div>
+  </section>
+
+  <section class="container">
+
+    <div class="preview">
+      <div class="preview-frame">
+        <iframe id="preview" src="index.html?bg=dark" title="Предпросмотр оверлея"></iframe>
+      </div>
+      <div class="preview-info">
+        <h3>Так это выглядит на стриме</h3>
+        <p>
+          Иконка накрывается красным по кругу, цифра идёт от 60 до 0.
+          Фон прозрачный — на кадре видна только иконка, цифра и подписи.
+        </p>
+        <button class="btn ghost" onclick="restartPreview()">▶ Запустить заново</button>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="container steps">
+
+    <!-- 1 -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">1</div>
+        <div>
+          <h2>Добавь источник «Браузер»</h2>
+          <p>В OBS: Источники → + → Браузер</p>
+        </div>
+      </div>
+
+      <div class="code-box">
+        <span id="fileUrl">file:///C:/Users/Cr1stalz/Documents/Проект по умолчанию/dbd-bot/overlay/index.html</span>
+        <button class="copy-btn" onclick="copyText(document.getElementById('fileUrl').textContent)" title="Копировать">⧉</button>
+      </div>
+
+      <div class="hint">
+        💡 Проще нажать <b>«Обзор»</b> рядом с полем URL и выбрать файл
+        <b>index.html</b> из папки <b>overlay</b>.
+      </div>
+
+      <div class="hint">
+        📐 Ширина и высота источника: <b>400 × 400</b>. Размер просто масштабирует
+        оверлей — можно поставить и 600 × 600.
+      </div>
+    </div>
+
+    <!-- 2 -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">2</div>
+        <div>
+          <h2>Включи галочку в свойствах источника</h2>
+          <p>Без неё таймер не будет стартовать сам</p>
+        </div>
+      </div>
+
+      <ul class="check-list">
+        <li>
+          <span class="box">✓</span>
+          <span>
+            <b>Завершать работу источника, когда он не виден</b>
+            <small>Shutdown source when not visible</small>
+          </span>
+        </li>
+        <li>
+          <span class="box">✓</span>
+          <span>
+            <b>Обновлять браузер, когда сцена становится активной</b>
+            <small>Обязательно, если оверлей запускается при переходе на сцену.
+            Если таймер не должен перезапускаться при каждом входе в сцену — выключи.</small>
+          </span>
+        </li>
+      </ul>
+
+      <div class="hint">
+        ⚙️ Как это работает: OBS при скрытии источника полностью выгружает страницу,
+        а при показе — загружает заново. Загрузка страницы = старт таймера.
+        Никаких скриптов и плагинов.
+      </div>
+    </div>
+
+    <!-- 3 -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">3</div>
+        <div>
+          <h2>Проверь</h2>
+          <p>Скрыть → показать</p>
+        </div>
+      </div>
+
+      <p style="margin:0 0 16px;color:#a8a8b3;font-size:14px;line-height:1.65;">
+        Переключи видимость источника (иконка глаза в списке источников).
+        Как только он появится — таймер начнёт отсчёт с 60.
+      </p>
+
+      <div class="hint">
+        🎮 Удобно посадить источник на горячую клавишу:
+        <b>Настройки → Горячие клавиши → «Показать источник»</b>,
+        или на кнопку в Stream Deck / макросе.
+      </div>
+    </div>
+
+    <!-- 4 -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">4</div>
+        <div>
+          <h2>Настрой под себя</h2>
+          <p>Параметры добавляются в URL через ?</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Параметр</th>
+            <th>По умолчанию</th>
+            <th>Что делает</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>d=60</code></td>
+            <td>60</td>
+            <td>Длительность. DS 1 / 2 / 3 уровня — 40 / 50 / 60</td>
+          </tr>
+          <tr>
+            <td><code>sound=1</code></td>
+            <td>выкл</td>
+            <td>Писк на старте, на последних 3 секундах и в конце</td>
+          </tr>
+          <tr>
+            <td><code>warn=10</code></td>
+            <td>10</td>
+            <td>За сколько секунд включать жёлтую пульсацию</td>
+          </tr>
+          <tr>
+            <td><code>critical=5</code></td>
+            <td>5</td>
+            <td>За сколько секунд включать красную пульсацию</td>
+          </tr>
+          <tr>
+            <td><code>label=Текст</code></td>
+            <td>Решающий удар</td>
+            <td>Подпись под цифрой</td>
+          </tr>
+          <tr>
+            <td><code>icon=URL</code></td>
+            <td>icon.webp</td>
+            <td>Своя иконка вместо файла рядом</td>
+          </tr>
+          <tr>
+            <td><code>bg=dark</code></td>
+            <td>—</td>
+            <td>Тёмная подложка (только для проверки в браузере)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="hint">
+        Пример: <b>…/overlay/index.html?d=40&amp;sound=1</b> — 40 секунд и со звуком.
+      </div>
+    </div>
+
+    <!-- 5 -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">5</div>
+        <div>
+          <h2>Продвинуто: запуск по другому источнику</h2>
+          <p>Через OBS WebSocket</p>
+        </div>
+      </div>
+
+      <p style="margin:0 0 14px;color:#a8a8b3;font-size:14px;line-height:1.65;">
+        Если оверлей всегда висит на экране, а запускать его нужно по видимости
+        другого источника (например, картинки «зацепили») — включи WebSocket:
+        <b>Сервис → Настройки сервера WebSocket</b>.
+      </p>
+
+      <div class="code-box">
+        <span>index.html?mode=obs&amp;scene=Игра&amp;source=DS&amp;pass=ПАРОЛЬ</span>
+        <button class="copy-btn" onclick="copyText('index.html?mode=obs&scene=Игра&source=DS&pass=ПАРОЛЬ')" title="Копировать">⧉</button>
+      </div>
+
+      <div class="hint">
+        <b>scene</b> — сцена, где лежит источник-триггер, <b>source</b> — его имя,
+        <b>pass</b> — пароль из настроек WebSocket. Порт по умолчанию 4455,
+        можно задать свой: <b>ws=ws://127.0.0.1:4455</b>.
+        Отключить сброс при скрытии: <b>resetonhide=0</b>.
+      </div>
+    </div>
+
+    <!-- 6 -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">6</div>
+        <div>
+          <h2>Своя иконка</h2>
+          <p>Рядом с index.html уже лежит icon.webp</p>
+        </div>
+      </div>
+
+      <p style="margin:0;color:#a8a8b3;font-size:14px;line-height:1.7;">
+        Оверлей автоматически берёт <b>icon.webp</b> из своей папки. Хочешь другую
+        картинку — замени файл на свою (квадратную, с прозрачным фоном) или укажи
+        путь через <b>?icon=</b>. Если картинки нет — включится нарисованная заглушка.
+      </p>
+    </div>
+
+    <!-- FAQ -->
+
+    <div class="card">
+      <div class="step-title">
+        <div class="step-number">?</div>
+        <div>
+          <h2>Если что-то не так</h2>
+          <p>Частые случаи</p>
+        </div>
+      </div>
+
+      <table>
+        <tbody>
+          <tr>
+            <td style="width:46%;color:#e6e6ec;"><b>Таймер не стартует при показе</b></td>
+            <td>Не включена галочка «Завершать работу источника, когда он не виден»,
+            или источник показывается не в активной сцене.</td>
+          </tr>
+          <tr>
+            <td style="color:#e6e6ec;"><b>Перезапускается при смене сцены</b></td>
+            <td>Это галочка «Обновлять браузер, когда сцена становится активной».
+            Выключи её, если не нужно.</td>
+          </tr>
+          <tr>
+            <td style="color:#e6e6ec;"><b>Мелко / размыто</b></td>
+            <td>Увеличь размер источника — картинка масштабируется целиком.</td>
+          </tr>
+          <tr>
+            <td style="color:#e6e6ec;"><b>Плохо читается на светлом фоне</b></td>
+            <td>У текста есть тень, но лучше ставить оверлей на тёмную часть кадра.</td>
+          </tr>
+          <tr>
+            <td style="color:#e6e6ec;"><b>Генераторы закрыты раньше</b></td>
+            <td>DS перестаёт работать после починки всех генераторов, а таймер
+            считает только время — просто скрой источник.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </section>
+
+</main>
+
+<footer>
+  <div class="container">
+    «Мы не можем выбрать судьбу, но можем выбрать, как встретить её.»
+  </div>
+</footer>
+
+<script>
+  function restartPreview() {
+    var frame = document.getElementById("preview");
+    frame.src = "index.html?bg=dark&t=" + Date.now();
+  }
+
+  function copyText(text) {
+    var done = function () {
+      document.querySelectorAll(".copy-btn").forEach(function (b) {
+        var old = b.textContent;
+        b.textContent = "✓";
+        setTimeout(function () { b.textContent = old; }, 1200);
+      });
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, done);
+      return;
+    }
+
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    done();
+  }
+</script>
+
+</body>
+</html>

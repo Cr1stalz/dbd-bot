@@ -52,15 +52,26 @@
 
   .perk svg { width: 100%; height: 100%; display: block; }
 
-  /* иконка перка (icon.webp рядом с файлом или ?icon=...) */
-  .perk.has-icon { background: var(--icon) center / contain no-repeat; }
-  .perk.has-icon svg { display: none; }
-  .perk.has-icon .sweep { clip-path: polygon(50% 2.5%, 97.5% 50%, 50% 97.5%, 2.5% 50%); }
+  /* настоящая иконка перка */
+  .art-icon {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    -webkit-user-drag: none;
+  }
+
+  .art-svg { display: none !important; }
+
+  /* если картинки нет — показываем нарисованную заглушку */
+  .perk.no-icon .art-icon { display: none; }
+  .perk.no-icon .art-svg { display: block !important; }
+  .perk.no-icon .sweep { clip-path: polygon(50% 11%, 89% 50%, 50% 89%, 11% 50%); }
 
   .sweep {
     position: absolute;
     inset: 0;
-    clip-path: polygon(50% 11%, 89% 50%, 50% 89%, 11% 50%);
+    clip-path: polygon(50% 2.5%, 97.5% 50%, 50% 97.5%, 2.5% 50%);
     background: conic-gradient(
       from 0deg,
       rgba(255, 58, 58, .8) 0deg,
@@ -180,7 +191,8 @@
 <div class="stage" id="stage">
 
   <div class="perk" id="perk">
-    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <img class="art-icon" id="artIcon" src="icon.webp" alt="">
+    <svg class="art-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>
         <linearGradient id="pg" x1="0" y1="0" x2=".55" y2="1">
           <stop offset="0" stop-color="#7d5eb2"/>
@@ -305,24 +317,18 @@
   var lastSecond = -1;
   var lastShown = "";
 
-  /* иконка: ?icon=путь, либо icon.webp / icon.png рядом с index.html */
-  function useIcon(url) {
-    perk.style.setProperty("--icon", 'url("' + url + '")');
-    perk.classList.add("has-icon");
-  }
-
+  /* иконка: icon.webp рядом с index.html, можно переопределить ?icon=... */
   (function initIcon() {
+    var icon = document.getElementById("artIcon");
     var custom = q.get("icon");
-    if (custom) { useIcon(custom); return; }
+    if (custom) icon.src = custom;
 
-    var names = ["icon.webp", "icon.png", "icon.jpg"];
-    (function tryNext(i) {
-      if (i >= names.length) return; // останется нарисованная иконка
-      var img = new Image();
-      img.onload = function () { useIcon(names[i]); };
-      img.onerror = function () { tryNext(i + 1); };
-      img.src = names[i];
-    })(0);
+    function fallback() {
+      perk.classList.add("no-icon");
+    }
+
+    icon.addEventListener("error", fallback);
+    if (icon.complete && icon.naturalWidth === 0) fallback();
   })();
 
   function setState(s) {

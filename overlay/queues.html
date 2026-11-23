@@ -6,6 +6,7 @@
     ?regions=eu-central-1,eu-west-1   — какие регионы показывать
     &mode=live                        — live | live-event | ptb | ptb-event
     &title=Очереди                    — заголовок панели
+    &color=a855f7                     — цвет виджета в HEX (3 или 6 знаков)
     &scale=1.2                        — масштаб (0.5–3)
     &refresh=60                       — автообновление в секундах (мин. 20)
     &only=online                      — скрыть офлайн-регионы
@@ -28,10 +29,11 @@
   :root {
     --scale: 1;
     --accent: #a855f7;
-    --accent-soft: rgba(168, 85, 247, .16);
+    --accent-rgb: 168, 85, 247;
+    --accent-light-rgb: 203, 176, 247;
     --ink: #f6f2fa;
     --muted: #9b94a9;
-    --line: rgba(168, 85, 247, .18);
+    --line: rgba(var(--accent-rgb), .18);
     --panel-alpha: .86;
     --fast: #64d98c;
     --mid: #ffc24d;
@@ -73,11 +75,11 @@
     border: 1px solid var(--line);
     border-radius: 1.15em;
     background:
-      radial-gradient(120% 140% at 0% 0%, rgba(168, 85, 247, .22), transparent 58%),
+      radial-gradient(120% 140% at 0% 0%, rgba(var(--accent-rgb), .22), transparent 58%),
       rgba(17, 13, 27, var(--panel-alpha));
     box-shadow:
       0 1.2em 2.4em rgba(0, 0, 0, .45),
-      0 0 3em rgba(130, 70, 210, .12),
+      0 0 3em rgba(var(--accent-rgb), .12),
       inset 0 1px 0 rgba(255, 255, 255, .06);
     color: var(--ink);
     overflow: hidden;
@@ -127,7 +129,7 @@
   body[data-status="ok"] .dot {
     background: var(--fast);
     color: var(--fast);
-    animation: pulse 2.4s ease-in-out infinite;
+    animation: pulse 4.5s ease-in-out infinite;
   }
 
   body[data-status="error"] .dot {
@@ -137,7 +139,7 @@
 
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
-    50%      { opacity: .55; transform: scale(.82); }
+    50%      { opacity: .22; transform: scale(.9); }
   }
 
   body.fresh .dot { animation: freshPop .55s ease-out; }
@@ -149,7 +151,7 @@
   }
 
   @keyframes freshText {
-    0%   { color: #e4d4ff; text-shadow: 0 0 .7em rgba(168, 85, 247, .85); }
+    0%   { color: rgb(var(--accent-light-rgb)); text-shadow: 0 0 .7em rgba(var(--accent-rgb), .85); }
     100% { color: var(--muted); text-shadow: none; }
   }
 
@@ -160,7 +162,7 @@
     text-indent: .2em;
     text-transform: uppercase;
     white-space: nowrap;
-    text-shadow: 0 0 .7em rgba(168, 85, 247, .45);
+    text-shadow: 0 0 .7em rgba(var(--accent-rgb), .45);
   }
 
   .mode {
@@ -168,9 +170,9 @@
     font-size: .66em;
     letter-spacing: .08em;
     text-transform: uppercase;
-    color: #c9b6e8;
+    color: rgb(var(--accent-light-rgb));
     border: 1px solid var(--line);
-    background: rgba(168, 85, 247, .07);
+    background: rgba(var(--accent-rgb), .07);
     border-radius: 99em;
     padding: .38em .7em .34em;
     white-space: nowrap;
@@ -203,10 +205,10 @@
     align-items: center;
     gap: .65em;
     padding: .5em .55em;
-    border: 1px solid rgba(168, 85, 247, .24);
+    border: 1px solid rgba(var(--accent-rgb), .24);
     border-radius: .72em;
-    background: rgba(168, 85, 247, .06);
-    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, .05);
+    background: rgba(var(--accent-rgb), .06);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .05);
     transition: opacity .25s ease, filter .25s ease;
   }
 
@@ -285,7 +287,7 @@
     font-size: .55em;
     letter-spacing: .09em;
     text-transform: uppercase;
-    color: rgba(203, 176, 247, .55);
+    color: rgba(var(--accent-light-rgb), .55);
     white-space: nowrap;
   }
 
@@ -332,13 +334,13 @@
     margin-top: .7em;
     font-size: .68em;
     letter-spacing: .04em;
-    color: rgba(203, 176, 247, .48);
+    color: rgba(var(--accent-light-rgb), .48);
   }
 
   .foot span:last-child { text-align: right; }
 
-  .credit { color: rgba(203, 176, 247, .62); }
-  .credit b { color: #dcc9ff; font-weight: 600; }
+  .credit { color: rgba(var(--accent-light-rgb), .62); }
+  .credit b { color: rgb(var(--accent-light-rgb)); font-weight: 600; }
 
   .refreshing .rows { opacity: .55; }
   .rows { transition: opacity .2s ease; }
@@ -411,11 +413,37 @@
     return isFinite(n) ? n : fallback;
   }
 
+  function parseHexColor(value) {
+    if (!value) return null;
+
+    var hex = String(value).trim().replace(/^#/, "");
+
+    if (/^[0-9a-f]{3}$/i.test(hex)) {
+      hex = hex.split("").map(function (c) { return c + c; }).join("");
+    }
+
+    if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+
+    function channel(start) { return parseInt(hex.slice(start, start + 2), 16); }
+    function light(c) { return Math.round(c + (255 - c) * .58); }
+
+    var r = channel(0);
+    var g = channel(2);
+    var b = channel(4);
+
+    return {
+      hex: "#" + hex.toLowerCase(),
+      rgb: r + ", " + g + ", " + b,
+      light: light(r) + ", " + light(g) + ", " + light(b)
+    };
+  }
+
   var CFG = {
     regions: (q.get("regions") || "eu-central-1,eu-west-1,eu-west-2")
       .split(",").map(function (s) { return s.trim(); }).filter(Boolean),
     mode: MODES[q.get("mode")] ? q.get("mode") : "live",
     title: q.get("title") || "Очередь DBD",
+    color: q.get("color") || "",
     refresh: Math.max(20, num(q.get("refresh"), 60)),
     scale: Math.min(3, Math.max(.5, num(q.get("scale"), 1))),
     onlyOnline: q.get("only") === "online",
@@ -431,6 +459,14 @@
 
   document.documentElement.style.setProperty("--scale", CFG.scale);
   document.documentElement.style.setProperty("--panel-alpha", CFG.opacity);
+
+  var customColor = parseHexColor(CFG.color);
+  if (customColor) {
+    document.documentElement.style.setProperty("--accent", customColor.hex);
+    document.documentElement.style.setProperty("--accent-rgb", customColor.rgb);
+    document.documentElement.style.setProperty("--accent-light-rgb", customColor.light);
+  }
+
   document.body.dataset.align = CFG.align;
   document.body.dataset.valign = CFG.valign;
   document.body.style.padding = CFG.pad + "px";

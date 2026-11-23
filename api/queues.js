@@ -9,7 +9,7 @@
 // Параметры:
 //   regions — список регионов через запятую (по умолчанию eu-central-1,eu-west-1,eu-west-2)
 //   mode    — live | live-event | ptb | ptb-event (по умолчанию live)
-//   only    — all, чтобы показать и офлайн-регионы (по умолчанию только онлайн)
+//   only    — online, чтобы скрыть офлайн-регионы (по умолчанию показываются все)
 //   max     — максимум регионов в ответе (по умолчанию 4, чтобы влезло в чат)
 //   title   — свой заголовок вместо «Очереди»
 
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
   const query = req.query || {};
   const regions = parseList(query.regions);
   const mode = parseMode(query.mode);
-  const showOffline = query.only === "all";
+  const showOffline = query.only !== "online";
   const title = (Array.isArray(query.title) ? query.title[0] : query.title) || "Очереди";
 
   let max = Number(Array.isArray(query.max) ? query.max[0] : query.max) || 4;

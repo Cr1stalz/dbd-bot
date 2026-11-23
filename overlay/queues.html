@@ -22,7 +22,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Очереди — оверлей</title>
+<title>Очередь DBD — оверлей</title>
 
 <style>
   :root {
@@ -330,7 +330,7 @@
     justify-content: space-between;
     gap: .8em;
     margin-top: .7em;
-    font-size: .6em;
+    font-size: .68em;
     letter-spacing: .04em;
     color: rgba(203, 176, 247, .48);
   }
@@ -350,7 +350,7 @@
 <div class="board" id="board">
   <div class="head">
     <span class="dot"></span>
-    <div class="title" id="title">Очереди</div>
+    <div class="title" id="title">Очередь DBD</div>
     <div class="mode" id="mode">Обычный режим</div>
   </div>
 
@@ -415,7 +415,7 @@
     regions: (q.get("regions") || "eu-central-1,eu-west-1,eu-west-2")
       .split(",").map(function (s) { return s.trim(); }).filter(Boolean),
     mode: MODES[q.get("mode")] ? q.get("mode") : "live",
-    title: q.get("title") || "Очереди",
+    title: q.get("title") || "Очередь DBD",
     refresh: Math.max(20, num(q.get("refresh"), 60)),
     scale: Math.min(3, Math.max(.5, num(q.get("scale"), 1))),
     onlyOnline: q.get("only") === "online",

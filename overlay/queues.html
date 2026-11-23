@@ -10,6 +10,8 @@
     &refresh=60                       — автообновление в секундах (мин. 20)
     &only=online                      — скрыть офлайн-регионы
     &panel=0                          — без тёмной подложки
+    &opacity=0.86                     — прозрачность подложки (0–1)
+    &fade=1                           — общая непрозрачность оверлея (0.1–1)
     &pad=12                           — отступ от края в пикселях
     &align=left|center|right          — выравнивание по горизонтали
     &valign=top|middle|bottom         — выравнивание по вертикали
@@ -30,7 +32,7 @@
     --ink: #f6f2fa;
     --muted: #9b94a9;
     --line: rgba(168, 85, 247, .18);
-    --panel: rgba(17, 13, 27, .86);
+    --panel-alpha: .86;
     --fast: #64d98c;
     --mid: #ffc24d;
     --slow: #ff6b73;
@@ -72,7 +74,7 @@
     border-radius: 1.15em;
     background:
       radial-gradient(120% 140% at 0% 0%, rgba(168, 85, 247, .22), transparent 58%),
-      var(--panel);
+      rgba(17, 13, 27, var(--panel-alpha));
     box-shadow:
       0 1.2em 2.4em rgba(0, 0, 0, .45),
       0 0 3em rgba(130, 70, 210, .12),
@@ -136,6 +138,19 @@
   @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50%      { opacity: .55; transform: scale(.82); }
+  }
+
+  body.fresh .dot { animation: freshPop .55s ease-out; }
+  body.fresh #updated { animation: freshText .7s ease-out; }
+
+  @keyframes freshPop {
+    0%   { transform: scale(1.45); box-shadow: 0 0 1.2em currentColor; }
+    100% { transform: scale(1); box-shadow: 0 0 .5em currentColor; }
+  }
+
+  @keyframes freshText {
+    0%   { color: #e4d4ff; text-shadow: 0 0 .7em rgba(168, 85, 247, .85); }
+    100% { color: var(--muted); text-shadow: none; }
   }
 
   .title {
@@ -337,7 +352,7 @@
 
   <div class="sub">
     <span id="updated">загрузка…</span>
-    <span id="server">deadbyqueue.com</span>
+    <span id="dataage">deadbyqueue.com</span>
   </div>
 
   <div class="rows" id="rows"></div>
@@ -403,6 +418,8 @@
     scale: Math.min(3, Math.max(.5, num(q.get("scale"), 1))),
     onlyOnline: q.get("only") === "online",
     panel: q.get("panel") !== "0",
+    opacity: Math.min(1, Math.max(0, num(q.get("opacity"), .86))),
+    fade: Math.min(1, Math.max(.1, num(q.get("fade"), 1))),
     pad: Math.max(0, Math.min(120, num(q.get("pad"), 12))),
     align: q.get("align") === "center" ? "center" : q.get("align") === "right" ? "right" : "left",
     valign: q.get("valign") === "middle" ? "middle" : q.get("valign") === "bottom" ? "bottom" : "top"
@@ -411,6 +428,7 @@
   if (!CFG.regions.length) CFG.regions = ["eu-central-1"];
 
   document.documentElement.style.setProperty("--scale", CFG.scale);
+  document.documentElement.style.setProperty("--panel-alpha", CFG.opacity);
   document.body.dataset.align = CFG.align;
   document.body.dataset.valign = CFG.valign;
   document.body.style.padding = CFG.pad + "px";
@@ -420,8 +438,10 @@
   var modeEl = document.getElementById("mode");
   var rowsEl = document.getElementById("rows");
   var updatedEl = document.getElementById("updated");
+  var dataageEl = document.getElementById("dataage");
   var hintEl = document.getElementById("hint");
   boardEl.classList.toggle("no-panel", !CFG.panel);
+  boardEl.style.opacity = CFG.fade;
   titleEl.textContent = CFG.title;
   modeEl.textContent = MODES[CFG.mode];
   hintEl.textContent = "обновление " + CFG.refresh + " с";
@@ -492,6 +512,19 @@
 
     var d = Math.round(h / 24);
     return d + " " + plural(d, "день", "дня", "дней") + " назад";
+  }
+
+  function fmtAgoShort(seconds) {
+    var s = Math.max(0, Math.round(seconds));
+    if (s < 60) return s + " с назад";
+
+    var m = Math.round(s / 60);
+    if (m < 60) return m + " мин назад";
+
+    var h = Math.round(m / 60);
+    if (h < 48) return h + " ч назад";
+
+    return Math.round(h / 24) + " дн назад";
   }
 
   function severity(seconds) {
@@ -613,27 +646,34 @@
     });
 
     var ts = Number(queues.lastupdated2);
-    lastUpdatedTs = isFinite(ts) && ts > 0 ? ts : 0;
+    lastDataTs = isFinite(ts) && ts > 0 ? ts : 0;
     updateAge();
   }
 
   function updateAge() {
-    if (!lastUpdatedTs) return;
     if (document.body.dataset.status === "error") return;
 
-    var age = Math.floor(Date.now() / 1000) - lastUpdatedTs;
-    updatedEl.textContent = "обновлено " + fmtAgo(age);
-    updatedEl.classList.toggle("stale", age > 45 * 60);
+    if (lastFetchTs) {
+      var fetchAge = Math.floor((Date.now() - lastFetchTs) / 1000);
+      updatedEl.textContent = "обновлено " + fmtAgoShort(fetchAge);
+    }
+
+    if (lastDataTs) {
+      var dataAge = Math.floor(Date.now() / 1000) - lastDataTs;
+      dataageEl.textContent = "данные " + fmtAgoShort(dataAge);
+      dataageEl.classList.toggle("stale", dataAge > 45 * 60);
+    }
   }
 
   /* ---------- загрузка ---------- */
 
   var controller = null;
   var requestId = 0;
-  var lastUpdatedTs = 0;
+  var lastFetchTs = 0;
+  var lastDataTs = 0;
 
   function getJson(url, signal) {
-    return fetch(url, { signal: signal, headers: { Accept: "application/json" } })
+    return fetch(url, { signal: signal, cache: "no-store", headers: { Accept: "application/json" } })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -662,7 +702,10 @@
         if (id !== requestId) return;
         document.body.dataset.status = "ok";
         updatedEl.classList.remove("error");
+        lastFetchTs = Date.now();
         render(data[0], data[1], data[2]);
+        document.body.classList.add("fresh");
+        setTimeout(function () { document.body.classList.remove("fresh"); }, 750);
       })
       .catch(function (error) {
         if (id !== requestId) return;

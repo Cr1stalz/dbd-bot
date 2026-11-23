@@ -25,11 +25,12 @@
 <style>
   :root {
     --scale: 1;
-    --accent: #ef3340;
+    --accent: #a855f7;
+    --accent-soft: rgba(168, 85, 247, .16);
     --ink: #f6f2fa;
     --muted: #9b94a9;
-    --line: rgba(255, 255, 255, .09);
-    --panel: rgba(13, 11, 17, .84);
+    --line: rgba(168, 85, 247, .18);
+    --panel: rgba(17, 13, 27, .86);
     --fast: #64d98c;
     --mid: #ffc24d;
     --slow: #ff6b73;
@@ -70,10 +71,11 @@
     border: 1px solid var(--line);
     border-radius: 1.15em;
     background:
-      radial-gradient(120% 140% at 0% 0%, rgba(239, 51, 64, .14), transparent 55%),
+      radial-gradient(120% 140% at 0% 0%, rgba(168, 85, 247, .22), transparent 58%),
       var(--panel);
     box-shadow:
       0 1.2em 2.4em rgba(0, 0, 0, .45),
+      0 0 3em rgba(130, 70, 210, .12),
       inset 0 1px 0 rgba(255, 255, 255, .06);
     color: var(--ink);
     overflow: hidden;
@@ -143,6 +145,7 @@
     text-indent: .2em;
     text-transform: uppercase;
     white-space: nowrap;
+    text-shadow: 0 0 .7em rgba(168, 85, 247, .45);
   }
 
   .mode {
@@ -150,8 +153,9 @@
     font-size: .66em;
     letter-spacing: .08em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: #c9b6e8;
     border: 1px solid var(--line);
+    background: rgba(168, 85, 247, .07);
     border-radius: 99em;
     padding: .38em .7em .34em;
     white-space: nowrap;
@@ -184,9 +188,9 @@
     align-items: center;
     gap: .65em;
     padding: .5em .55em;
-    border: 1px solid rgba(255, 255, 255, .055);
+    border: 1px solid rgba(168, 85, 247, .11);
     border-radius: .72em;
-    background: rgba(255, 255, 255, .035);
+    background: rgba(168, 85, 247, .055);
     transition: opacity .25s ease, filter .25s ease;
   }
 
@@ -253,7 +257,7 @@
     min-width: 4.7em;
     padding: .3em .45em .26em;
     border-radius: .55em;
-    background: rgba(0, 0, 0, .28);
+    background: rgba(10, 6, 18, .42);
     text-align: right;
   }
 
@@ -262,7 +266,7 @@
     font-size: .55em;
     letter-spacing: .09em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: rgba(203, 176, 247, .55);
     white-space: nowrap;
   }
 
@@ -309,12 +313,13 @@
     margin-top: .7em;
     font-size: .6em;
     letter-spacing: .04em;
-    color: rgba(255, 255, 255, .38);
+    color: rgba(203, 176, 247, .48);
   }
 
   .foot span:last-child { text-align: right; }
 
-  .credit b { color: rgba(255, 255, 255, .62); font-weight: 600; }
+  .credit { color: rgba(203, 176, 247, .62); }
+  .credit b { color: #dcc9ff; font-weight: 600; }
 
   .refreshing .rows { opacity: .55; }
   .rows { transition: opacity .2s ease; }

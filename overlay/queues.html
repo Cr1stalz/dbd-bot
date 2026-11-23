@@ -314,6 +314,8 @@
 
   .foot span:last-child { text-align: right; }
 
+  .credit b { color: rgba(255, 255, 255, .62); font-weight: 600; }
+
   .refreshing .rows { opacity: .55; }
   .rows { transition: opacity .2s ease; }
 </style>
@@ -336,7 +338,7 @@
   <div class="rows" id="rows"></div>
 
   <div class="foot">
-    <span>Убийца / выживший</span>
+    <span class="credit">OBS-оверлей by <b>Cr1stalz</b></span>
     <span id="hint"></span>
   </div>
 </div>
@@ -465,26 +467,32 @@
     return mm ? h + "ч " + mm + "м" : h + "ч";
   }
 
+  function plural(n, one, few, many) {
+    var n10 = n % 10;
+    var n100 = n % 100;
+    if (n10 === 1 && n100 !== 11) return one;
+    if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return few;
+    return many;
+  }
+
   function fmtAgo(seconds) {
     var s = Math.max(0, Math.round(seconds));
-    if (s < 90) return "только что";
+    if (s < 60) return s + " " + plural(s, "секунду", "секунды", "секунд") + " назад";
+
     var m = Math.round(s / 60);
-    if (m < 60) return m + " мин назад";
+    if (m < 60) return m + " " + plural(m, "минуту", "минуты", "минут") + " назад";
+
     var h = Math.round(m / 60);
-    if (h < 48) return h + " ч назад";
-    return Math.round(h / 24) + " дн назад";
+    if (h < 48) return h + " " + plural(h, "час", "часа", "часов") + " назад";
+
+    var d = Math.round(h / 24);
+    return d + " " + plural(d, "день", "дня", "дней") + " назад";
   }
 
   function severity(seconds) {
     if (seconds <= 60) return "fast";
     if (seconds <= 180) return "mid";
     return "slow";
-  }
-
-  function clock(date) {
-    var hh = String(date.getHours()).padStart(2, "0");
-    var mm = String(date.getMinutes()).padStart(2, "0");
-    return hh + ":" + mm;
   }
 
   /* ---------- построение строк ---------- */
@@ -600,18 +608,24 @@
     });
 
     var ts = Number(queues.lastupdated2);
-    if (isFinite(ts) && ts > 0) {
-      var when = new Date(ts * 1000);
-      updatedEl.textContent = "обновлено в " + clock(when);
-      var age = now - ts;
-      updatedEl.classList.toggle("stale", age > 45 * 60);
-    }
+    lastUpdatedTs = isFinite(ts) && ts > 0 ? ts : 0;
+    updateAge();
+  }
+
+  function updateAge() {
+    if (!lastUpdatedTs) return;
+    if (document.body.dataset.status === "error") return;
+
+    var age = Math.floor(Date.now() / 1000) - lastUpdatedTs;
+    updatedEl.textContent = "обновлено " + fmtAgo(age);
+    updatedEl.classList.toggle("stale", age > 45 * 60);
   }
 
   /* ---------- загрузка ---------- */
 
   var controller = null;
   var requestId = 0;
+  var lastUpdatedTs = 0;
 
   function getJson(url, signal) {
     return fetch(url, { signal: signal, headers: { Accept: "application/json" } })
@@ -641,9 +655,9 @@
     Promise.all(jobs)
       .then(function (data) {
         if (id !== requestId) return;
-        render(data[0], data[1], data[2]);
         document.body.dataset.status = "ok";
         updatedEl.classList.remove("error");
+        render(data[0], data[1], data[2]);
       })
       .catch(function (error) {
         if (id !== requestId) return;
@@ -660,6 +674,7 @@
   buildRows();
   refresh();
   setInterval(refresh, CFG.refresh * 1000);
+  setInterval(updateAge, 1000);
 
   // если вкладка была свёрнута — обновляемся сразу при возврате
   document.addEventListener("visibilitychange", function () {

@@ -150,7 +150,7 @@ export default async function handler(req, res) {
     }
 
     const text = list.length
-      ? `${head}: ${list.join(" · ")}`
+      ? `${head}: ${list.join(" | ")}`
       : `${head}: сейчас нет данных по выбранным регионам`;
 
     if (CACHE_TTL > 0) {

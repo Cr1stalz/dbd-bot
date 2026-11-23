@@ -203,9 +203,10 @@
     align-items: center;
     gap: .65em;
     padding: .5em .55em;
-    border: 1px solid rgba(168, 85, 247, .11);
+    border: 1px solid rgba(168, 85, 247, .24);
     border-radius: .72em;
-    background: rgba(168, 85, 247, .055);
+    background: rgba(168, 85, 247, .06);
+    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, .05);
     transition: opacity .25s ease, filter .25s ease;
   }
 
@@ -219,7 +220,9 @@
     border-radius: .16em;
     object-fit: cover;
     background: rgba(255, 255, 255, .08);
-    box-shadow: 0 .1em .25em rgba(0, 0, 0, .45);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, .2),
+      0 .1em .25em rgba(0, 0, 0, .45);
   }
 
   .flag-text {
@@ -232,6 +235,7 @@
     font-size: .9em;
     border-radius: .16em;
     background: rgba(255, 255, 255, .07);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .2);
   }
 
   .meta {
@@ -654,12 +658,12 @@
     var stale = false;
 
     if (lastFetchTs) {
-      fetchText = "обновлено " + fmtAgoShort(Math.floor((Date.now() - lastFetchTs) / 1000));
+      fetchText = "проверено " + fmtAgoShort(Math.floor((Date.now() - lastFetchTs) / 1000));
     }
 
     if (lastDataTs) {
       var dataAge = nowSec - lastDataTs;
-      dataText = "данные " + fmtAgoShort(dataAge).replace(/ назад$/, "");
+      dataText = "данные " + fmtAgoShort(dataAge);
       stale = dataAge > 45 * 60;
     }
 

@@ -352,14 +352,12 @@
 
   <div class="sub">
     <span id="updated">загрузка…</span>
-    <span id="dataage">deadbyqueue.com</span>
   </div>
 
   <div class="rows" id="rows"></div>
 
   <div class="foot">
     <span class="credit">OBS-оверлей by <b>Cr1stalz</b></span>
-    <span id="hint"></span>
   </div>
 </div>
 
@@ -438,13 +436,10 @@
   var modeEl = document.getElementById("mode");
   var rowsEl = document.getElementById("rows");
   var updatedEl = document.getElementById("updated");
-  var dataageEl = document.getElementById("dataage");
-  var hintEl = document.getElementById("hint");
   boardEl.classList.toggle("no-panel", !CFG.panel);
   boardEl.style.opacity = CFG.fade;
   titleEl.textContent = CFG.title;
   modeEl.textContent = MODES[CFG.mode];
-  hintEl.textContent = "обновление " + CFG.refresh + " с";
 
   /* ---------- вспомогательное ---------- */
 
@@ -653,16 +648,25 @@
   function updateAge() {
     if (document.body.dataset.status === "error") return;
 
+    var nowSec = Math.floor(Date.now() / 1000);
+    var fetchText = "";
+    var dataText = "";
+    var stale = false;
+
     if (lastFetchTs) {
-      var fetchAge = Math.floor((Date.now() - lastFetchTs) / 1000);
-      updatedEl.textContent = "обновлено " + fmtAgoShort(fetchAge);
+      fetchText = "обновлено " + fmtAgoShort(Math.floor((Date.now() - lastFetchTs) / 1000));
     }
 
     if (lastDataTs) {
-      var dataAge = Math.floor(Date.now() / 1000) - lastDataTs;
-      dataageEl.textContent = "данные " + fmtAgoShort(dataAge);
-      dataageEl.classList.toggle("stale", dataAge > 45 * 60);
+      var dataAge = nowSec - lastDataTs;
+      dataText = "данные " + fmtAgoShort(dataAge).replace(/ назад$/, "");
+      stale = dataAge > 45 * 60;
     }
+
+    if (fetchText) {
+      updatedEl.textContent = dataText ? fetchText + " · " + dataText : fetchText;
+    }
+    updatedEl.classList.toggle("stale", stale);
   }
 
   /* ---------- загрузка ---------- */

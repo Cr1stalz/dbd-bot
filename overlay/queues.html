@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<!--
+  Очереди Dead by Daylight — оверлей для OBS (Browser Source).
+
+  Параметры ссылки:
+    ?regions=eu-central-1,eu-west-1   — какие регионы показывать
+    &mode=live                        — live | live-event | ptb | ptb-event
+    &title=Очереди                    — заголовок панели
+    &scale=1.2                        — масштаб (0.5–3)
+    &refresh=60                       — автообновление в секундах (мин. 20)
+    &only=online                      — скрыть офлайн-регионы
+    &panel=0                          — без тёмной подложки
+    &pad=12                           — отступ от края в пикселях
+    &align=left|center|right          — выравнивание по горизонтали
+    &valign=top|middle|bottom         — выравнивание по вертикали
+
+  Данные: api2.deadbyqueue.com. Флаги лежат в папке flags/.
+-->
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Очереди — оверлей</title>
+
+<style>
+  :root {
+    --scale: 1;
+    --accent: #ef3340;
+    --ink: #f6f2fa;
+    --muted: #9b94a9;
+    --line: rgba(255, 255, 255, .09);
+    --panel: rgba(13, 11, 17, .84);
+    --fast: #64d98c;
+    --mid: #ffc24d;
+    --slow: #ff6b73;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    font-family: Bahnschrift, "DIN Alternate", "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    cursor: default;
+  }
+
+  body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 12px;
+  }
+
+  body[data-align="center"] { justify-content: center; }
+  body[data-align="right"]  { justify-content: flex-end; }
+  body[data-valign="middle"] { align-items: center; }
+  body[data-valign="bottom"] { align-items: flex-end; }
+
+  /* ---------- ПАНЕЛЬ ---------- */
+
+  .board {
+    position: relative;
+    font-size: calc(15px * var(--scale));
+    width: 30.5em;
+    padding: 1.05em 1.15em 1em;
+    border: 1px solid var(--line);
+    border-radius: 1.15em;
+    background:
+      radial-gradient(120% 140% at 0% 0%, rgba(239, 51, 64, .14), transparent 55%),
+      var(--panel);
+    box-shadow:
+      0 1.2em 2.4em rgba(0, 0, 0, .45),
+      inset 0 1px 0 rgba(255, 255, 255, .06);
+    color: var(--ink);
+    overflow: hidden;
+    animation: boardIn .35s cubic-bezier(.2, 1, .3, 1);
+  }
+
+  .board.no-panel {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .board::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: .85;
+  }
+
+  .board.no-panel::before { display: none; }
+
+  @keyframes boardIn {
+    from { opacity: 0; transform: translateY(.35em) scale(.985); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ---------- ШАПКА ---------- */
+
+  .head {
+    display: flex;
+    align-items: center;
+    gap: .6em;
+  }
+
+  .dot {
+    width: .52em;
+    height: .52em;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #7b7487;
+    box-shadow: 0 0 .5em currentColor;
+    color: #7b7487;
+  }
+
+  body[data-status="ok"] .dot {
+    background: var(--fast);
+    color: var(--fast);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  body[data-status="error"] .dot {
+    background: var(--slow);
+    color: var(--slow);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: .55; transform: scale(.82); }
+  }
+
+  .title {
+    font-size: 1.06em;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-indent: .2em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .mode {
+    margin-left: auto;
+    font-size: .66em;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 99em;
+    padding: .38em .7em .34em;
+    white-space: nowrap;
+  }
+
+  .sub {
+    display: flex;
+    justify-content: space-between;
+    gap: .8em;
+    margin: .5em 0 0 1.12em;
+    font-size: .66em;
+    letter-spacing: .02em;
+    color: var(--muted);
+  }
+
+  .sub .stale { color: var(--mid); }
+  .sub .error { color: var(--slow); }
+
+  /* ---------- СТРОКИ ---------- */
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: .4em;
+    margin-top: .85em;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: .65em;
+    padding: .5em .55em;
+    border: 1px solid rgba(255, 255, 255, .055);
+    border-radius: .72em;
+    background: rgba(255, 255, 255, .035);
+    transition: opacity .25s ease, filter .25s ease;
+  }
+
+  .row.is-offline { opacity: .5; filter: saturate(.6); }
+  .row.is-hidden { display: none; }
+
+  .flag {
+    width: 1.5em;
+    height: 1.02em;
+    flex: 0 0 auto;
+    border-radius: .16em;
+    object-fit: cover;
+    background: rgba(255, 255, 255, .08);
+    box-shadow: 0 .1em .25em rgba(0, 0, 0, .45);
+  }
+
+  .flag-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.02em;
+    flex: 0 0 auto;
+    font-size: .9em;
+    border-radius: .16em;
+    background: rgba(255, 255, 255, .07);
+  }
+
+  .meta {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .city {
+    font-size: 1em;
+    font-weight: 600;
+    letter-spacing: .01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .country {
+    margin-top: .12em;
+    font-size: .66em;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ---------- ВРЕМЯ ---------- */
+
+  .times {
+    display: flex;
+    align-items: stretch;
+    gap: .35em;
+    flex: 0 0 auto;
+  }
+
+  .cell {
+    min-width: 4.7em;
+    padding: .3em .45em .26em;
+    border-radius: .55em;
+    background: rgba(0, 0, 0, .28);
+    text-align: right;
+  }
+
+  .cell .label {
+    display: block;
+    font-size: .55em;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .cell .val {
+    display: block;
+    margin-top: .12em;
+    font-size: .98em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: .01em;
+    white-space: nowrap;
+  }
+
+  .val.fast { color: var(--fast); }
+  .val.mid  { color: var(--mid); }
+  .val.slow { color: var(--slow); }
+
+  .state {
+    display: none;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 9.75em;
+    padding-right: .2em;
+    font-size: .74em;
+    letter-spacing: .02em;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .row.is-offline .times .cell,
+  .row.is-missing .times .cell { display: none; }
+
+  .row.is-offline .state,
+  .row.is-missing .state { display: flex; }
+
+  /* ---------- ПОДВАЛ ---------- */
+
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: .8em;
+    margin-top: .7em;
+    font-size: .6em;
+    letter-spacing: .04em;
+    color: rgba(255, 255, 255, .38);
+  }
+
+  .foot span:last-child { text-align: right; }
+
+  .refreshing .rows { opacity: .55; }
+  .rows { transition: opacity .2s ease; }
+</style>
+</head>
+
+<body data-status="loading" data-align="left" data-valign="top">
+
+<div class="board" id="board">
+  <div class="head">
+    <span class="dot"></span>
+    <div class="title" id="title">Очереди</div>
+    <div class="mode" id="mode">Обычный режим</div>
+  </div>
+
+  <div class="sub">
+    <span id="updated">загрузка…</span>
+    <span id="server">deadbyqueue.com</span>
+  </div>
+
+  <div class="rows" id="rows"></div>
+
+  <div class="foot">
+    <span>Убийца / выживший</span>
+    <span id="hint"></span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- регионы: русские названия ---------- */
+
+  var REGIONS = {
+    "us-east-1":      { name: "Вирджиния",   country: "США · Восток",        flag: "us" },
+    "us-east-2":      { name: "Огайо",       country: "США · Восток",        flag: "us" },
+    "us-west-1":      { name: "Калифорния",  country: "США · Запад",         flag: "us" },
+    "us-west-2":      { name: "Орегон",      country: "США · Запад",         flag: "us" },
+    "ca-central-1":   { name: "Монреаль",    country: "Канада",              flag: "ca" },
+    "eu-central-1":   { name: "Франкфурт",   country: "Германия",            flag: "de" },
+    "eu-west-1":      { name: "Дублин",      country: "Ирландия",            flag: "ie" },
+    "eu-west-2":      { name: "Лондон",      country: "Великобритания",      flag: "gb" },
+    "sa-east-1":      { name: "Сан-Паулу",   country: "Бразилия",            flag: "br" },
+    "ap-south-1":     { name: "Мумбаи",      country: "Индия",               flag: "in" },
+    "ap-east-1":      { name: "Гонконг",     country: "Китай",               flag: "hk" },
+    "ap-northeast-1": { name: "Токио",       country: "Япония",              flag: "jp" },
+    "ap-northeast-2": { name: "Сеул",        country: "Южная Корея",         flag: "kr" },
+    "ap-southeast-1": { name: "Сингапур",    country: "Сингапур",            flag: "sg" },
+    "ap-southeast-2": { name: "Сидней",      country: "Австралия",           flag: "au" }
+  };
+
+  var MODES = {
+    "live":       "Обычный режим",
+    "live-event": "Режим события",
+    "ptb":        "Тестовый клиент",
+    "ptb-event":  "PTB · событие"
+  };
+
+  var API = {
+    queues:  "https://api2.deadbyqueue.com/queues",
+    regions: "https://api2.deadbyqueue.com/regions",
+    when:    "https://api2.deadbyqueue.com/region/when"
+  };
+
+  /* ---------- настройки из ссылки ---------- */
+
+  var q = new URLSearchParams(location.search);
+
+  function num(value, fallback) {
+    var n = parseFloat(value);
+    return isFinite(n) ? n : fallback;
+  }
+
+  var CFG = {
+    regions: (q.get("regions") || "eu-central-1,eu-west-1,eu-west-2")
+      .split(",").map(function (s) { return s.trim(); }).filter(Boolean),
+    mode: MODES[q.get("mode")] ? q.get("mode") : "live",
+    title: q.get("title") || "Очереди",
+    refresh: Math.max(20, num(q.get("refresh"), 60)),
+    scale: Math.min(3, Math.max(.5, num(q.get("scale"), 1))),
+    onlyOnline: q.get("only") === "online",
+    panel: q.get("panel") !== "0",
+    pad: Math.max(0, Math.min(120, num(q.get("pad"), 12))),
+    align: q.get("align") === "center" ? "center" : q.get("align") === "right" ? "right" : "left",
+    valign: q.get("valign") === "middle" ? "middle" : q.get("valign") === "bottom" ? "bottom" : "top"
+  };
+
+  if (!CFG.regions.length) CFG.regions = ["eu-central-1"];
+
+  document.documentElement.style.setProperty("--scale", CFG.scale);
+  document.body.dataset.align = CFG.align;
+  document.body.dataset.valign = CFG.valign;
+  document.body.style.padding = CFG.pad + "px";
+
+  var boardEl = document.getElementById("board");
+  var titleEl = document.getElementById("title");
+  var modeEl = document.getElementById("mode");
+  var rowsEl = document.getElementById("rows");
+  var updatedEl = document.getElementById("updated");
+  var hintEl = document.getElementById("hint");
+  boardEl.classList.toggle("no-panel", !CFG.panel);
+  titleEl.textContent = CFG.title;
+  modeEl.textContent = MODES[CFG.mode];
+  hintEl.textContent = "обновление " + CFG.refresh + " с";
+
+  /* ---------- вспомогательное ---------- */
+
+  function el(tag, className) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    return node;
+  }
+
+  function info(code) {
+    return REGIONS[code] || { name: code, country: "регион", flag: null };
+  }
+
+  function buildFlag(code) {
+    var data = info(code);
+
+    if (!data.flag) {
+      var fallback = el("div", "flag-text");
+      fallback.textContent = "🌐";
+      return fallback;
+    }
+
+    var img = el("img", "flag");
+    img.src = "flags/" + data.flag + ".png";
+    img.alt = "";
+    img.addEventListener("error", function () {
+      var globe = el("div", "flag-text");
+      globe.textContent = "🌐";
+      if (img.parentNode) img.parentNode.replaceChild(globe, img);
+    });
+    return img;
+  }
+
+  /* 95 -> "1м 35с", 11 -> "11с", 3700 -> "1ч 2м" */
+  function fmtTime(seconds) {
+    var s = Math.max(0, Math.round(Number(seconds) || 0));
+    if (s < 60) return s + "с";
+
+    var m = Math.floor(s / 60);
+    var rest = s % 60;
+    if (m < 60) return rest ? m + "м " + rest + "с" : m + "м";
+
+    var h = Math.floor(m / 60);
+    var mm = m % 60;
+    return mm ? h + "ч " + mm + "м" : h + "ч";
+  }
+
+  function fmtAgo(seconds) {
+    var s = Math.max(0, Math.round(seconds));
+    if (s < 90) return "только что";
+    var m = Math.round(s / 60);
+    if (m < 60) return m + " мин назад";
+    var h = Math.round(m / 60);
+    if (h < 48) return h + " ч назад";
+    return Math.round(h / 24) + " дн назад";
+  }
+
+  function severity(seconds) {
+    if (seconds <= 60) return "fast";
+    if (seconds <= 180) return "mid";
+    return "slow";
+  }
+
+  function clock(date) {
+    var hh = String(date.getHours()).padStart(2, "0");
+    var mm = String(date.getMinutes()).padStart(2, "0");
+    return hh + ":" + mm;
+  }
+
+  /* ---------- построение строк ---------- */
+
+  var rowRefs = {};
+
+  function makeCell(label) {
+    var cell = el("div", "cell");
+    var cap = el("span", "label");
+    cap.textContent = label;
+    var val = el("span", "val");
+    val.textContent = "—";
+    cell.appendChild(cap);
+    cell.appendChild(val);
+    return { node: cell, val: val };
+  }
+
+  function buildRows() {
+    var frag = document.createDocumentFragment();
+
+    CFG.regions.forEach(function (code) {
+      var data = info(code);
+      var row = el("div", "row");
+      row.dataset.region = code;
+
+      var flag = buildFlag(code);
+
+      var meta = el("div", "meta");
+      var city = el("div", "city");
+      city.textContent = data.name;
+      var country = el("div", "country");
+      country.textContent = data.country;
+      meta.appendChild(city);
+      meta.appendChild(country);
+
+      var times = el("div", "times");
+      var killer = makeCell("Убийца");
+      var survivor = makeCell("Выживший");
+      var state = el("div", "state");
+      state.textContent = "—";
+
+      times.appendChild(killer.node);
+      times.appendChild(survivor.node);
+      times.appendChild(state);
+
+      row.appendChild(flag);
+      row.appendChild(meta);
+      row.appendChild(times);
+      frag.appendChild(row);
+
+      rowRefs[code] = { row: row, killer: killer.val, survivor: survivor.val, state: state, country: country };
+    });
+
+    rowsEl.innerHTML = "";
+    rowsEl.appendChild(frag);
+  }
+
+  function setCell(node, raw) {
+    if (raw === "x" || raw === null || raw === undefined || raw === "") {
+      node.textContent = "—";
+      node.className = "val";
+      return;
+    }
+
+    var sec = Number(raw);
+    if (!isFinite(sec)) {
+      node.textContent = "—";
+      node.className = "val";
+      return;
+    }
+
+    node.textContent = fmtTime(sec);
+    node.className = "val " + severity(sec);
+  }
+
+  /* ---------- отрисовка ---------- */
+
+  function render(queues, enabled, lastSeen) {
+    var modeData = (queues.queues && queues.queues[CFG.mode]) || {};
+    var enabledMap = (enabled && enabled.regions) || {};
+    var seenMap = (lastSeen && lastSeen.regions) || {};
+    var now = Math.floor(Date.now() / 1000);
+
+    CFG.regions.forEach(function (code) {
+      var ref = rowRefs[code];
+      if (!ref) return;
+
+      var regionEnabled = enabledMap[code] !== false;
+      var entry = modeData[code];
+      var hasTimes = entry && (entry.killer || entry.survivor);
+
+      var hide = CFG.onlyOnline && (!regionEnabled || !hasTimes);
+      ref.row.classList.toggle("is-hidden", hide);
+      ref.row.classList.toggle("is-offline", !regionEnabled);
+      ref.row.classList.toggle("is-missing", regionEnabled && !hasTimes);
+
+      if (!regionEnabled) {
+        ref.country.textContent = info(code).country + " · не в сети";
+        var seen = seenMap[code];
+        ref.state.textContent = seen ? fmtAgo(now - seen) : "не в сети";
+        return;
+      }
+
+      ref.country.textContent = info(code).country;
+
+      if (!hasTimes) {
+        ref.state.textContent = "нет данных";
+        return;
+      }
+
+      setCell(ref.killer, entry.killer && entry.killer.time);
+      setCell(ref.survivor, entry.survivor && entry.survivor.time);
+    });
+
+    var ts = Number(queues.lastupdated2);
+    if (isFinite(ts) && ts > 0) {
+      var when = new Date(ts * 1000);
+      updatedEl.textContent = "обновлено в " + clock(when);
+      var age = now - ts;
+      updatedEl.classList.toggle("stale", age > 45 * 60);
+    }
+  }
+
+  /* ---------- загрузка ---------- */
+
+  var controller = null;
+  var requestId = 0;
+
+  function getJson(url, signal) {
+    return fetch(url, { signal: signal, headers: { Accept: "application/json" } })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+  }
+
+  function refresh() {
+    requestId += 1;
+    var id = requestId;
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+    var signal = controller.signal;
+
+    boardEl.parentNode.classList.add("refreshing");
+
+    var jobs = [getJson(API.queues, signal), getJson(API.regions, signal)];
+
+    // /region/when не критичен — если упал, показываем просто «не в сети»
+    jobs.push(
+      getJson(API.when, signal).catch(function () { return null; })
+    );
+
+    Promise.all(jobs)
+      .then(function (data) {
+        if (id !== requestId) return;
+        render(data[0], data[1], data[2]);
+        document.body.dataset.status = "ok";
+        updatedEl.classList.remove("error");
+      })
+      .catch(function (error) {
+        if (id !== requestId) return;
+        if (error && error.name === "AbortError") return;
+        document.body.dataset.status = "error";
+        updatedEl.textContent = "нет связи — показываю последние данные";
+        updatedEl.classList.add("error");
+      })
+      .finally(function () {
+        if (id === requestId) boardEl.parentNode.classList.remove("refreshing");
+      });
+  }
+
+  buildRows();
+  refresh();
+  setInterval(refresh, CFG.refresh * 1000);
+
+  // если вкладка была свёрнута — обновляемся сразу при возврате
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) refresh();
+  });
+})();
+</script>
+
+</body>
+</html>

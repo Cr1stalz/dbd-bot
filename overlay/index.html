@@ -571,6 +571,14 @@
     if (type === "ds:reset") reset();
   });
 
+  /* OBS: перезапуск, когда источник снова становится видимым.
+     Работает и без галочки «Завершать работу источника, когда он не виден». */
+  if (window.obsstudio) {
+    window.addEventListener("obsSourceVisibleChanged", function (e) {
+      if (e.detail && e.detail.visible) start();
+    });
+  }
+
   if (CFG.mode === "obs") {
     reset();
     connectObs();

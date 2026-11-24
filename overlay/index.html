@@ -263,15 +263,16 @@
 
   var CFG = {
     duration: numArg(q.get("d"), 60),
-    label: q.get("label") || "Решающий удар",
-    mode: q.get("mode") === "obs" ? "obs" : "load",
-    obs: {
-      url: q.get("ws") || "ws://127.0.0.1:4455",
-      password: q.get("pass") || "",
-      scene: q.get("scene") || "",
-      source: q.get("source") || "",
-      resetOnHide: q.get("resetonhide") !== "0"
-    }
+    label: q.get("label") || "Решающий удар"
+  };
+
+  /* Подписка на видимость самого источника через OBS WebSocket.
+     Нужна, когда OBS не перезагружает страницу при скрытии/показе. */
+  var OBS = {
+    url: q.get("ws") || "ws://127.0.0.1:4455",
+    pass: q.get("pass") || "",
+    source: q.get("source") || "",
+    scene: q.get("scene") || ""
   };
 
   var WARN_AT = 10;
@@ -285,10 +286,12 @@
   var debugEl = document.getElementById("debug");
 
   document.body.classList.toggle("debug", q.get("debug") === "1");
+  var DEBUG = q.get("debug") === "1";
   titleEl.textContent = CFG.label;
 
   var state = "idle";
   var running = false;
+  var starts = 0;
   var deadline = 0;
   var lastSecond = -1;
   var lastShown = "";
@@ -340,6 +343,7 @@
   function start() {
     deadline = performance.now() + CFG.duration * 1000;
     running = true;
+    starts++;
     lastSecond = -1;
     lastShown = "";
     setState("running");
@@ -431,7 +435,7 @@
   var reqId = 1;
   var pending = {};
   var connected = false;
-  var sceneItemId = null;
+  var itemKeys = [];
 
   function b64(bytes) {
     var s = "";
@@ -466,31 +470,41 @@
     connected = true;
     debug("obs: подключено");
 
-    if (!CFG.obs.scene || !CFG.obs.source) {
-      debug("obs: не заданы scene/source — старт по загрузке");
-      start();
+    if (!OBS.source) {
+      debug("obs: источник не задан (?source=) — старт только по загрузке");
       return;
     }
 
-    request("GetSceneItemId", { sceneName: CFG.obs.scene, sourceName: CFG.obs.source })
+    request("GetSceneList")
       .then(function (r) {
-        sceneItemId = r.responseData.sceneItemId;
-        debug("obs: item " + sceneItemId);
-        return request("GetSceneItemEnabled", { sceneName: CFG.obs.scene, sceneItemId: sceneItemId });
+        var current = r.responseData.currentProgramSceneName;
+        var names = OBS.scene
+          ? [OBS.scene]
+          : (r.responseData.scenes || []).map(function (s) { return s.sceneName; });
+
+        return Promise.all(
+          names.map(function (name) {
+            return request("GetSceneItemId", { sceneName: name, sourceName: OBS.source })
+              .then(function (res) {
+                var id = res.responseData.sceneItemId;
+                itemKeys.push(name + "|" + id);
+                if (name !== current) return;
+                return request("GetSceneItemEnabled", { sceneName: name, sceneItemId: id })
+                  .then(function (en) {
+                    if (!en.responseData.sceneItemEnabled) reset();
+                  });
+              })
+              .catch(function () { /* в этой сцене такого источника нет */ });
+          })
+        );
       })
-      .then(function (r) {
-        if (r.responseData.sceneItemEnabled) start();
-        else reset();
-      })
-      .catch(function (e) {
-        debug("obs: ошибка — " + e.message);
-        reset();
-      });
+      .then(function () { debug("obs: слежу за " + itemKeys.length + " экз."); })
+      .catch(function (e) { debug("obs: " + e.message); });
   }
 
   function connectObs() {
     try {
-      ws = new WebSocket(CFG.obs.url);
+      ws = new WebSocket(OBS.url);
     } catch (e) {
       setTimeout(connectObs, 3000);
       return;
@@ -501,17 +515,16 @@
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
 
       if (msg.op === 0) {
-        var identify = { rpcVersion: 1 };
+        var identify = { rpcVersion: 1, eventSubscriptions: 0x7ff };
         var auth = msg.d && msg.d.authentication;
         if (auth) {
-          authString(CFG.obs.password, auth.salt, auth.challenge)
+          authString(OBS.pass, auth.salt, auth.challenge)
             .then(function (sig) {
               identify.authentication = sig;
               ws.send(JSON.stringify({ op: 1, d: identify }));
             })
             .catch(function (e) {
               debug("obs: нет crypto.subtle — " + e.message);
-              reset();
             });
         } else {
           ws.send(JSON.stringify({ op: 1, d: identify }));
@@ -523,14 +536,15 @@
 
       if (msg.op === 5) {
         var d = msg.d || {};
-        if (
-          d.eventType === "SceneItemEnableStateChanged" &&
-          d.eventData &&
-          sceneItemId !== null &&
-          d.eventData.sceneItemId === sceneItemId
-        ) {
-          if (d.eventData.sceneItemEnabled) start();
-          else if (CFG.obs.resetOnHide) reset();
+        var data = d.eventData || {};
+        if (DEBUG) {
+          var buf = window.__obsEvents = window.__obsEvents || [];
+          buf.push({ t: d.eventType, d: data });
+          if (buf.length > 40) buf.shift();
+        }
+        if (d.eventType === "SceneItemEnableStateChanged") {
+          var key = data.sceneName + "|" + data.sceneItemId;
+          if (itemKeys.indexOf(key) !== -1 && data.sceneItemEnabled) start();
         }
         return;
       }
@@ -562,7 +576,9 @@
     reset: reset,
     expire: expire,
     get state() { return state; },
-    get connected() { return connected; }
+    get connected() { return connected; },
+    get starts() { return starts; },
+    get items() { return itemKeys; }
   };
 
   window.addEventListener("message", function (e) {
@@ -571,22 +587,20 @@
     if (type === "ds:reset") reset();
   });
 
-  /* OBS: перезапуск, когда источник снова становится видимым.
-     Работает и без галочки «Завершать работу источника, когда он не виден». */
+  /* OBS: перезапуск, когда источник снова становится видимым. */
   if (window.obsstudio) {
     window.addEventListener("obsSourceVisibleChanged", function (e) {
       if (e.detail && e.detail.visible) start();
     });
   }
 
-  if (CFG.mode === "obs") {
-    reset();
-    connectObs();
-  } else {
-    // «Обновлять браузер при активации сцены» / «Завершать работу, когда не виден»
-    // перезагружают страницу — значит старт по загрузке = старт по показу источника.
-    requestAnimationFrame(start);
-  }
+  // «Обновлять браузер при активации сцены» / «Завершать работу, когда не виден»
+  // перезагружают страницу — значит старт по загрузке = старт по показу источника.
+  requestAnimationFrame(start);
+
+  // Если в URL указан ?source=..., следим за видимостью источника в OBS
+  // и перезапускаем таймер, когда его показывают снова.
+  if (OBS.source) connectObs();
 })();
 </script>
 
